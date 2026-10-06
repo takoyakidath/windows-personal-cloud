@@ -1,0 +1,725 @@
+produce.txt
+
+# Windows Personal Cloud
+
+## 目的
+
+Windows PCを、自分専用の
+・リモートWindows
+・ゲームPC
+・開発環境
+・Linuxサーバー
+・個人クラウド
+として運用する。
+
+最重要目標は、
+
+「Windowsを再インストールしても、
+ほぼワンクリックで元の環境を再構築できる」
+
+こと。
+
+---
+
+# 最終ユーザー体験
+
+Windowsをクリーンインストール
+↓
+初期セットアップ
+↓
+Win + R
+↓
+Bootstrapを起動
+↓
+GitHubからこのリポジトリを取得
+↓
+管理者権限を取得
+↓
+必要な設定を自動判定
+↓
+必要なソフトを自動インストール
+↓
+必要なWindows設定を適用
+↓
+WSL2
+↓
+Ubuntu
+↓
+Docker
+↓
+Tailscale
+↓
+SSH
+↓
+SMB
+↓
+Parsec
+↓
+Workspace
+↓
+Docker services
+↓
+winctl
+↓
+Health Check
+↓
+READY
+
+ユーザーは可能な限り操作しない。
+
+ただし、
+・管理者権限
+・再起動
+・認証
+・ディスクを初期化するような危険な操作
+については勝手に実行しない。
+
+---
+
+# GitHub
+
+GitHub repository:
+
+windows-personal-cloud
+
+GitHubを環境構築のSource of Truthとして扱う。
+
+GitHubには、
+
+・PowerShell scripts
+・configuration
+・Docker Compose
+・installer
+・bootstrap
+・winctl
+・documentation
+
+を保存する。
+
+秘密情報は保存しない。
+
+禁止:
+
+.env
+API keys
+passwords
+tokens
+private keys
+credentials
+cookies
+Tailscale auth secrets
+
+---
+
+# Bootstrap
+
+最重要コンポーネント。
+
+Windows初期状態から実行できる。
+
+Bootstrapの責務:
+
+1. GitHub repositoryを取得
+2. repositoryのrevisionを確認
+3. 管理者権限を確認
+4. OS / architectureを確認
+5. storageを検出
+6. configurationを読み込む
+7. installerを実行
+8. 必要に応じて再起動
+9. 再起動後に自動的に続行
+10. 最終health check
+
+途中で失敗しても、
+再実行することで続きから実行できる設計にする。
+
+---
+
+# Idempotency
+
+非常に重要。
+
+すべてのinstaller/scriptは
+複数回実行しても壊れないこと。
+
+例:
+
+Gitが既に存在
+→ skip
+
+WSL2が既に有効
+→ skip
+
+Dockerが既に存在
+→ skip
+
+Workspaceが既に存在
+→ skip
+
+設定済み
+→ skip
+
+必要ならrepairする。
+
+---
+
+# Storage
+
+Workspaceのパスはハードコードしない。
+
+例:
+
+D:\Workspace
+
+ただしPCによってD:が存在しない可能性がある。
+
+そのため、
+
+config/workspace.json
+
+などで設定可能にする。
+
+候補:
+
+D:\Workspace
+E:\Workspace
+custom path
+
+---
+
+# Workspace
+
+標準構造:
+
+Workspace/
+├── Projects/
+├── Documents/
+├── Assets/
+├── Media/
+├── Games/
+├── Services/
+├── Configs/
+├── Exports/
+└── Backups/
+
+WorkspaceはSMBでMacからアクセスできるようにする。
+
+---
+
+# SMB
+
+Windows側:
+
+D:\Workspace
+
+↓
+
+SMB Share:
+
+Workspace
+
+Macからアクセス:
+
+smb://<windows-host>/Workspace
+
+LANでは直接アクセス。
+
+遠隔ではTailscale経由。
+
+TCP 445をInternetへ公開しない。
+
+SMBはバックアップではない。
+
+---
+
+# WSL2
+
+Windows
+└── WSL2
+    └── Ubuntu
+
+Linux development environmentとして利用。
+
+Git
+Docker
+Docker Compose
+CLI tools
+
+を配置する。
+
+Linux filesystemを必要以上にWindows filesystemへ置かない。
+
+Docker volumeや大量のsmall filesは
+WSL2側filesystemを優先する。
+
+---
+
+# Docker
+
+Docker ComposeをSource of Truthとする。
+
+Dockgeは管理UIとして利用可能。
+
+Docker services:
+
+docker/compose/
+
+に定義する。
+
+---
+
+# Remote Access
+
+Tailscaleを基本とする。
+
+Internetへ直接、
+
+RDP
+SSH
+SMB
+Docker management
+Dockge
+
+などを公開しない。
+
+---
+
+# Remote Windows
+
+通常のWindows作業:
+
+Mac
+↓
+Tailscale
+↓
+Windows App / RDP
+↓
+Windows
+
+ゲーム:
+
+Mac
+↓
+Tailscale
+↓
+Parsec
+↓
+Windows
+↓
+Steam / Games
+
+---
+
+# SSH
+
+Mac
+↓
+Tailscale
+↓
+Windows SSH
+↓
+WSL2 Ubuntu
+
+という開発経路を作る。
+
+可能ならSSH key authenticationを利用。
+
+PasswordAuthenticationは無効化する。
+
+---
+
+# winctl
+
+Windows Personal Cloudを操作するCLI。
+
+例:
+
+winctl status
+winctl mode
+winctl game
+winctl work
+winctl server
+winctl sleep
+winctl wake
+winctl update
+winctl reboot
+winctl shutdown
+winctl doctor
+winctl services
+winctl disk
+winctl backup
+winctl restore
+winctl sync
+winctl logs
+winctl history
+
+---
+
+# winctl status
+
+例:
+
+Windows Personal Cloud
+────────────────────────────
+MODE       : SERVER
+STATE      : READY
+
+CPU        : 8%
+GPU        : 4%
+RAM        : 18 / 64 GB
+GPU VRAM   : 3 / 16 GB
+
+Tailscale  : ✓
+OpenSSH    : ✓
+WSL2       : ✓
+Docker     : ✓
+Parsec     : ✓
+SMB        : ✓
+
+Workspace  : D:\Workspace
+Backup     : OK
+
+Health     : HEALTHY
+Uptime     : 3d 12h
+
+---
+
+# Modes
+
+READY
+GAME
+WORK
+SERVER
+SLEEP
+DEGRADED
+ERROR
+
+状態遷移を管理する。
+
+GAME:
+
+不要なserver/serviceを停止可能。
+
+WORK:
+
+開発・Adobe等のWindows作業を優先。
+
+SERVER:
+
+Docker services等を優先。
+
+SLEEP:
+
+実際のWindows Sleepではなく、
+不要なサービスを停止したidle状態を基本とする。
+
+---
+
+# Discord
+
+将来的にDiscord Botから操作できるようにする。
+
+例:
+
+/win status
+/win wake
+/win sleep
+/win game
+/win work
+/win server
+/win update
+/win reboot
+
+任意のPowerShellを実行できる機能は作らない。
+
+Allowlist方式。
+
+---
+
+# Monitoring
+
+最低限:
+
+CPU
+GPU
+RAM
+VRAM
+temperature
+disk
+network
+Docker
+Tailscale
+SSH
+SMB
+
+を確認できるようにする。
+
+まずはwinctl statusを中心に実装。
+
+Prometheus/Grafanaは後から追加可能。
+
+---
+
+# Backup
+
+役割を分離する。
+
+GitHub
+=
+環境定義
+
+Windows + Workspace
+=
+現在のデータ
+
+External SSD / NAS
+=
+バックアップ
+
+winctl backup
+
+で、
+
+Projects
+Documents
+Assets
+Media
+Services
+Configs
+Database dumps
+
+などをバックアップ。
+
+GitHubへ個人データを保存しない。
+
+---
+
+# Restore
+
+winctl restore
+
+またはBootstrapから、
+
+GitHub
+↓
+environment
+↓
+Windows
+↓
+Workspace
+↓
+Backup
+↓
+restore
+
+という流れで復元できるようにする。
+
+---
+
+# Sync
+
+winctl sync
+
+で、
+
+・現在の環境情報収集
+・package list
+・Windows configuration
+・WSL configuration
+・Docker configuration
+・winctl configuration
+
+などを安全な形式でexport。
+
+秘密情報を除外。
+
+Git statusを確認。
+
+必要ならcommit/push。
+
+---
+
+# Installer
+
+最終的には、
+
+install.exe
+
+またはそれに近い
+one-click installer
+
+を作る。
+
+ただし開発初期は
+PowerShell scriptを直接利用してよい。
+
+重要なのはEXE化より、
+
+「完全自動」
+「再実行可能」
+「失敗から復旧可能」
+
+であること。
+
+---
+
+# Installer Flow
+
+install.exe
+↓
+Administrator check
+↓
+GitHub repository取得
+↓
+Windows configuration
+↓
+winget
+↓
+PowerShell
+↓
+Git
+↓
+WSL2
+↓
+Ubuntu
+↓
+Docker
+↓
+Tailscale
+↓
+OpenSSH
+↓
+SMB
+↓
+Parsec
+↓
+Workspace
+↓
+Firewall
+↓
+winctl
+↓
+Docker services
+↓
+Health Check
+↓
+READY
+
+---
+
+# Reboot Handling
+
+Windows設定によっては再起動が必要になる。
+
+再起動後に、
+
+「どこまで終わったか」
+
+を自動判定して続きを実行する。
+
+state fileなどを利用してよい。
+
+例:
+
+bootstrap-state.json
+
+{
+  "windows": "completed",
+  "wsl": "completed",
+  "docker": "completed",
+  "tailscale": "pending"
+}
+
+---
+
+# Safety
+
+絶対に、
+
+既存ディスクを勝手にformatしない。
+
+既存データを勝手に削除しない。
+
+秘密情報をGitHubへpushしない。
+
+InternetへRDP/SSH/SMBを公開しない。
+
+管理者権限を必要以上に利用しない。
+
+---
+
+# Project Structure
+
+windows-personal-cloud/
+
+├── bootstrap/
+├── installer/
+├── scripts/
+├── winctl/
+├── docker/
+├── config/
+├── docs/
+├── tests/
+├── .github/
+├── README.md
+├── produce.txt
+└── .gitignore
+
+---
+
+# Development Policy
+
+Claude Codeはこのproduce.txtを仕様書として扱う。
+
+実装時は、
+
+1. 現在のWindows環境を調査
+2. 小さいscriptから実装
+3. 手動で動作確認
+4. idempotency確認
+5. error handling追加
+6. test追加
+7. bootstrapへ統合
+8. 最後にinstaller化
+
+の順番で進める。
+
+一度に巨大なinstallerを作らない。
+
+---
+
+# Definition of Done
+
+以下を満たしたらv1完成。
+
+[ ] Windows初期状態からBootstrapを実行できる
+[ ] GitHubから自動取得できる
+[ ] 管理者権限を適切に扱える
+[ ] WSL2が自動構築される
+[ ] Ubuntuが構築される
+[ ] Dockerが構築される
+[ ] Tailscaleが構築される
+[ ] SSHが構築される
+[ ] SMBが構築される
+[ ] Workspaceが作成される
+[ ] winctl statusが動く
+[ ] winctl doctorが動く
+[ ] 再起動後に続きから実行できる
+[ ] 途中失敗後に再実行できる
+[ ] secretsがGitHubへ入らない
+[ ] 既存データを破壊しない
+[ ] clean Windowsから再構築できる
+
+最終目標:
+
+「Windowsを入れ直した。
+
+Win + R。
+
+Bootstrap。
+
+あとは待つだけ。
+
+自分のWindows Personal Cloudが戻ってきた。」
+
+これを実現する。
