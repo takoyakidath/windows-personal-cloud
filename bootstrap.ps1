@@ -26,7 +26,14 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri $RawBootstrap -OutFile $self -UseBasicParsing
     }
-    Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$self`"")
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$self`"") -ErrorAction Stop
+    } catch {
+        Write-Host ''
+        Write-Host "Could not get Administrator rights: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host 'Open an elevated terminal instead (right-click Start > Terminal (Admin)) and run:' -ForegroundColor Yellow
+        Write-Host "  irm $RawBootstrap | iex" -ForegroundColor Yellow
+    }
     return
 }
 

@@ -28,9 +28,11 @@
         $end = '# END windows-personal-cloud'
 
         $managed = @()
+        $personal = @()   # keys that give a human a full shell (not the controller's forced-command key)
         $userKeys = Join-Path $Ctx.RepoRoot 'config\ssh\authorized_keys'
         if (Test-Path -LiteralPath $userKeys) {
-            $managed += @(Get-Content -LiteralPath $userKeys | Where-Object { $_ -match '^(ssh-|ecdsa-|sk-)' })
+            $personal = @(Get-Content -LiteralPath $userKeys | Where-Object { $_ -match '^(ssh-|ecdsa-|sk-)' })
+            $managed += $personal
         }
         $controllerKey = Join-Path $Ctx.RepoRoot 'config\ssh\controller.pub'
         if (Test-Path -LiteralPath $controllerKey) {
@@ -56,9 +58,11 @@
         & icacls.exe $keysFile /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F' | Out-Null
         Write-Done "$($managed.Count) managed key(s) installed"
 
-        $allKeys = @($kept | Where-Object { $_ -match '^[^#].*(ssh-|ecdsa-|sk-)' }) + $managed
+        # Only turn off passwords when a person can still get in with a key. The controller key alone
+        # must not lock the owner out (it can only run `winctl remote`).
+        $loginKeys = @($kept | Where-Object { $_ -match '^(ssh-|ecdsa-|sk-)' }) + $personal
         $config = Join-Path $sshDir 'sshd_config'
-        if ($allKeys.Count -gt 0 -and (Test-Path -LiteralPath $config)) {
+        if ($loginKeys.Count -gt 0 -and (Test-Path -LiteralPath $config)) {
             $text = Get-Content -LiteralPath $config -Raw
             $desired = 'PasswordAuthentication no'
             if ($text -notmatch '(?m)^PasswordAuthentication no\s*$') {
@@ -69,7 +73,7 @@
                 Write-Done 'Password authentication disabled'
             }
         } else {
-            Add-ManualAction 'No SSH public keys in config/ssh; password authentication left enabled.'
+            Add-ManualAction 'No personal SSH key (config/ssh/authorized_keys); password authentication left enabled.'
         }
         return 'ok'
     }
