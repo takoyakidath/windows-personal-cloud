@@ -102,6 +102,7 @@ jobs:
           Assert ($status.name -eq 'Alienware m17 R3') "winctl status --json (state $($status.state))"
           C:\ProgramData\winctl\bin\winctl.cmd doctor
           Write-Host "doctor exit $LASTEXITCODE (DEGRADED expected: no WSL/Tailscale here)"
+          exit 0
 
       - name: Verify SSH forced command (controller key)
         shell: powershell
