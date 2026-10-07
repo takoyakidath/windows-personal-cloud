@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -222,5 +223,6 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
 def run(config: Config) -> None:
     token = os.environ.get("DISCORD_TOKEN")
     if not token:
-        raise SystemExit("DISCORD_TOKEN is not set (see config/controller.env.example)")
+        print("DISCORD_TOKEN is not set (see config/controller.env.example)", file=sys.stderr)
+        raise SystemExit(78)  # EX_CONFIG: systemd will not restart-loop on it
     ControllerBot(config).run(token, log_handler=None)

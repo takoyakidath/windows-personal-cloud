@@ -15,6 +15,8 @@ TimeoutStartSec=300
 WatchdogSec=120
 Restart=always
 RestartSec=10
+# Missing token / bad config: stay stopped until fixed instead of restarting forever.
+RestartPreventExitStatus=78
 
 # Hardening: the controller only needs the network, its state and its logs.
 NoNewPrivileges=true

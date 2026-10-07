@@ -11,7 +11,21 @@ core/     設定、状態ファイル、ログ、systemd notify
 config/   設定の例（実ファイルは /etc/windows-controller/）
 ```
 
-## Install
+## SD カードから作る（推奨）
+
+1. Raspberry Pi OS **Lite** (64-bit) を SD カードに書き込む（Raspberry Pi Imager、または `xz -dc image.img.xz | sudo dd of=/dev/rdiskN bs=4m`）。
+2. Mac に挿し直して `bootfs` がマウントされたら、初回起動の設定を書く:
+
+   ```bash
+   scripts/prepare-pi-sd.sh /Volumes/bootfs                       # パスワードを聞かれる (有線 DHCP)
+   scripts/prepare-pi-sd.sh /Volumes/bootfs --from <古い bootfs のコピー>   # 以前の Imager カードのパスワード/Wi-Fi を流用
+   ```
+
+3. Pi に挿して起動 → 数分後、`wpc-controller.local` に SSH できる。初回起動で `/opt/windows-personal-cloud` に clone され、
+   `controller/install.sh --hardware-watchdog` まで自動で実行される。進捗: `sudo tail -f /var/log/cloud-init-output.log`
+4. 下の「その後」の 1〜5（token / controller.json / 公開鍵）を行う。token や設定が揃うまで、サービスは再起動を繰り返さずに停止している。
+
+## Install（手動）
 
 Raspberry Pi OS (Bookworm, Python 3.11)。Pi は Windows と同じ有線 LAN に置く（WoL はブロードキャスト）。
 

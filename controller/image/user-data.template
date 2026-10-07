@@ -1,0 +1,29 @@
+#cloud-config
+# First-boot setup for the Raspberry Pi controller (written by scripts/prepare-pi-sd.sh).
+# Contains a password *hash* only; no tokens or other secrets.
+hostname: @HOSTNAME@
+manage_etc_hosts: true
+timezone: @TIMEZONE@
+keyboard:
+  model: pc105
+  layout: "@KEYBOARD@"
+users:
+- name: @USER@
+  groups: users,adm,dialout,netdev,video,plugdev,gpio,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: "@PASSWD_HASH@"
+enable_ssh: true
+ssh_pwauth: true
+package_update: true
+packages:
+- git
+- avahi-daemon
+runcmd:
+- |
+  set -e
+  for i in $(seq 1 20); do
+    git clone --branch "@BRANCH@" "@REPO_URL@" /opt/windows-personal-cloud && break
+    rm -rf /opt/windows-personal-cloud; sleep 15
+  done
+  /opt/windows-personal-cloud/controller/install.sh --hardware-watchdog
