@@ -1,196 +1,497 @@
-produce.txt
-
 # Windows Personal Cloud
 
-## 目的
+## 1. Project Overview
 
-Windows PCを、自分専用の
-・リモートWindows
-・ゲームPC
-・開発環境
-・Linuxサーバー
-・個人クラウド
-として運用する。
+Windows PCを単なる個人用PCではなく、
 
-最重要目標は、
+* Windows Workstation
+* Gaming PC
+* Development Server
+* Personal Cloud
+* Remote Computer
+* Home Server
 
-「Windowsを再インストールしても、
-ほぼワンクリックで元の環境を再構築できる」
+として利用できるようにする。
 
-こと。
+Windowsを再インストールしても、GitHub上の設定・スクリプトから環境を再構築できるようにする。
+
+目標は、
+
+> 「PCを壊しても、Windowsを入れ直しても、GitHubから環境を再構築できる」
+
+状態。
 
 ---
 
-# 最終ユーザー体験
+# 2. Goals
 
-Windowsをクリーンインストール
-↓
-初期セットアップ
-↓
+## 2.1 Environment as Code
+
+PCの環境を可能な限りコード・設定ファイルとして管理する。
+
+GitHub Repositoryを環境構築のSource of Truthとする。
+
+管理対象:
+
+* Windows設定
+* インストールするアプリ
+* WSL2
+* Docker
+* Workspace
+* Windows Firewall
+* SSH
+* SMB
+* Tailscale
+* Parsec
+* winctl
+* Discord Bot
+* Raspberry Pi Controller
+* サーバー設定
+* 自動起動設定
+* Scheduled Tasks
+* Backup設定
+
+---
+
+## 2.2 Rebuildable
+
+Windowsを完全に再インストールした場合でも、
+
+```text
+Windows Install
+    ↓
 Win + R
-↓
-Bootstrapを起動
-↓
-GitHubからこのリポジトリを取得
-↓
-管理者権限を取得
-↓
-必要な設定を自動判定
-↓
-必要なソフトを自動インストール
-↓
-必要なWindows設定を適用
-↓
-WSL2
-↓
-Ubuntu
-↓
-Docker
-↓
-Tailscale
-↓
-SSH
-↓
-SMB
-↓
-Parsec
-↓
-Workspace
-↓
-Docker services
-↓
-winctl
-↓
-Health Check
-↓
+    ↓
+Bootstrap
+    ↓
+GitHub
+    ↓
+自動セットアップ
+    ↓
+Windows PC完成
+```
+
+という流れで復旧できるようにする。
+
+---
+
+## 2.3 Remote First
+
+外出先やMacからWindows PCを操作できるようにする。
+
+主なアクセス方法:
+
+* Tailscale
+* SSH
+* Windows App / RDP
+* Parsec
+* SMB
+
+インターネットへ直接、
+
+* RDP
+* SSH
+* SMB
+* Docker API
+* 管理画面
+
+などを公開しない。
+
+基本的にTailscaleまたはLAN経由でアクセスする。
+
+---
+
+## 2.4 Low Power
+
+Windows PCを24時間起動し続ける必要がないようにする。
+
+必要がない時間帯は、
+
+* WSL2
+* Docker
+* サーバー
+* SMB
+* SSH
+* Parsec
+* その他不要なサービス
+
+を停止し、最終的にはWindowsをHibernateへ移行する。
+
+必要になったらRaspberry PiからWake-on-LANで起動する。
+
+---
+
+# 3. Core Concept
+
+システムを以下の4つに分離する。
+
+```text
+GitHub
+    │
+    │ Configuration / Scripts
+    ▼
+Windows PC
+    │
+    ├── Workstation
+    ├── Gaming
+    ├── WSL2
+    ├── Docker
+    ├── Workspace
+    └── Services
+
+Raspberry Pi
+    │
+    ├── Discord Controller
+    ├── Wake-on-LAN
+    ├── Health Check
+    └── Windows Boot Monitor
+```
+
+役割:
+
+```text
+GitHub
+= PCの設計図
+
+Windows
+= 実際のコンピューティング
+
+Raspberry Pi
+= Always-on Controller
+
+Discord
+= Remote Control Interface
+```
+
+---
+
+# 4. Architecture
+
+```text
+                         Internet
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+             Discord                 Tailscale
+                │                       │
+                ▼                       ▼
+       Raspberry Pi              Alienware m17 R3
+       Always-on Controller              │
+                │                         │
+                │ Wake-on-LAN             │
+                └────────────────────────►│
+                                          │
+                             ┌────────────┴────────────┐
+                             │                         │
+                          Windows                    WSL2
+                             │                         │
+                    ┌────────┼────────┐               │
+                    │        │        │               │
+                  Games    Work    Services         Docker
+                             │                         │
+                             └──────── Workspace ──────┘
+```
+
+---
+
+# 5. Always-on Controller
+
+## 5.1 Raspberry Pi
+
+使用していないRaspberry PiをWindows PCのControllerとして利用する。
+
+Raspberry Piは常時稼働する。
+
+ただし、高負荷な処理は行わない。
+
+主な役割:
+
+* Discord Bot
+* Wake-on-LAN
+* Windows PCの状態確認
+* Windows起動確認
+* Health Check
+* Boot Monitor
+* ログ管理
+
+---
+
+## 5.2 Raspberry Piの役割
+
+Raspberry PiはWindows PCそのものを置き換えるものではない。
+
+あくまで、
+
+> Windows PCが寝ているときでも動作できる「リモコン」
+
+として利用する。
+
+```text
+Discord
+   ↓
+Raspberry Pi
+   ↓
+Windows PC
+```
+
+---
+
+## 5.3 Raspberry Pi Directory
+
+Repository内では、将来的に以下のような構成を想定する。
+
+```text
+controller/
+├── README.md
+├── bot/
+├── wake/
+├── health/
+├── config/
+└── install.sh
+```
+
+---
+
+# 6. Discord Controller
+
+DiscordをWindows PCのRemote Control Interfaceとして利用する。
+
+Raspberry Pi上でDiscord Botを動作させる。
+
+Windows PCがHibernateしていてもDiscord Botは動作し続ける。
+
+---
+
+## 6.1 Commands
+
+最小構成:
+
+```text
+/win status
+/win wake
+```
+
+将来的に:
+
+```text
+/win sleep
+/win game
+/win work
+/win server
+/win update
+/win reboot
+/win shutdown
+/win doctor
+```
+
+を追加する。
+
+---
+
+## 6.2 Security
+
+Discord Botから任意のPowerShellやShellコマンドを実行できるようにはしない。
+
+実行可能な操作をAllowlist方式で管理する。
+
+Discord User IDまたはRoleによって実行権限を制限する。
+
+---
+
+# 7. `/win status`
+
+Windows PCの状態を確認する。
+
+例:
+
+```text
+🟢 Alienware m17 R3
+
+State: READY
+
+CPU: 4%
+RAM: 12 / 64 GB
+GPU: 3%
+VRAM: 2 / 8 GB
+
+Tailscale: OK
+SSH: OK
+WSL2: OK
+Docker: OK
+SMB: OK
+Workspace: OK
+
+Uptime: 4h 32m
+```
+
+Hibernate中:
+
+```text
+💤 Alienware m17 R3
+
+State: HIBERNATED
+
+Last Seen: 20:47
+```
+
+応答なし:
+
+```text
+🔴 Alienware m17 R3
+
+State: OFFLINE
+```
+
+---
+
+# 8. `/win wake`
+
+Windows PCを起動する。
+
+処理:
+
+```text
+Discord
+    ↓
+Raspberry Pi
+    ↓
+Windows PC状態確認
+    ↓
+すでに起動
+    ↓
 READY
+```
 
-ユーザーは可能な限り操作しない。
+停止・Hibernate中の場合:
 
-ただし、
-・管理者権限
-・再起動
-・認証
-・ディスクを初期化するような危険な操作
-については勝手に実行しない。
-
----
-
-# GitHub
-
-GitHub repository:
-
-windows-personal-cloud
-
-GitHubを環境構築のSource of Truthとして扱う。
-
-GitHubには、
-
-・PowerShell scripts
-・configuration
-・Docker Compose
-・installer
-・bootstrap
-・winctl
-・documentation
-
-を保存する。
-
-秘密情報は保存しない。
-
-禁止:
-
-.env
-API keys
-passwords
-tokens
-private keys
-credentials
-cookies
-Tailscale auth secrets
+```text
+Discord
+    ↓
+Raspberry Pi
+    ↓
+Wake-on-LAN
+    ↓
+Alienware m17 R3
+    ↓
+Windows起動
+    ↓
+Network確認
+    ↓
+Tailscale確認
+    ↓
+SSH確認
+    ↓
+WSL2 / Docker確認
+    ↓
+Health Check
+    ↓
+READY
+```
 
 ---
 
-# Bootstrap
+# 9. Wake-on-LAN
 
-最重要コンポーネント。
+Alienware m17 R3の内蔵RJ45 Ethernetを第一候補とする。
 
-Windows初期状態から実行できる。
+USB Ethernet Adapterではなく、可能な限り本体内蔵Ethernetを利用する。
 
-Bootstrapの責務:
-
-1. GitHub repositoryを取得
-2. repositoryのrevisionを確認
-3. 管理者権限を確認
-4. OS / architectureを確認
-5. storageを検出
-6. configurationを読み込む
-7. installerを実行
-8. 必要に応じて再起動
-9. 再起動後に自動的に続行
-10. 最終health check
-
-途中で失敗しても、
-再実行することで続きから実行できる設計にする。
+Raspberry PiからMagic Packetを送信する。
 
 ---
 
-# Idempotency
+## 9.1 WoL検証
 
-非常に重要。
+実装前に実機で以下を確認する。
 
-すべてのinstaller/scriptは
-複数回実行しても壊れないこと。
+1. WindowsからHibernate
+2. Raspberry PiからWake-on-LAN
+3. Alienwareが起動するか確認
+4. Windows起動後にネットワークが復帰するか確認
+5. Tailscaleが復帰するか確認
 
-例:
-
-Gitが既に存在
-→ skip
-
-WSL2が既に有効
-→ skip
-
-Dockerが既に存在
-→ skip
-
-Workspaceが既に存在
-→ skip
-
-設定済み
-→ skip
-
-必要ならrepairする。
+HibernateからWake-on-LANできるかは実機で検証する。
 
 ---
 
-# Storage
+# 10. BIOS Configuration
 
-Workspaceのパスはハードコードしない。
+Alienware m17 R3のBIOSで以下を確認する。
 
-例:
+* Wake on LAN
+* USB Wake Support
+* Deep Sleep Control
+* AC Wake
+* Auto Power On
+* Ethernet Wake関連設定
 
+必要なものだけ有効化する。
+
+不要なWake設定は有効化しない。
+
+---
+
+# 11. Windows Workstation
+
+Windows PCは以下を担当する。
+
+```text
+Windows
+├── Gaming
+├── Development
+├── Remote Desktop
+├── Parsec
+├── SMB
+├── SSH
+├── WSL2
+├── Docker
+└── Services
+```
+
+---
+
+# 12. WSL2
+
+Linux環境としてWSL2 Ubuntuを利用する。
+
+用途:
+
+* Linux development
+* Docker
+* Backend
+* Database
+* Server
+* CLI tools
+
+---
+
+## 12.1 Docker
+
+Docker Composeを利用する。
+
+可能な限りLinux側のDocker VolumeはWSL2 filesystem内に保存する。
+
+大量の小さいファイルを扱うDocker Volumeや`node_modules`をWindows filesystem上に置かない。
+
+---
+
+# 13. Workspace
+
+Workspaceの保存先は固定値にしない。
+
+デフォルト:
+
+```text
 D:\Workspace
+```
 
-ただしPCによってD:が存在しない可能性がある。
-
-そのため、
-
-config/workspace.json
-
-などで設定可能にする。
-
-候補:
-
-D:\Workspace
-E:\Workspace
-custom path
+ただしconfigで変更可能にする。
 
 ---
 
-# Workspace
+## 13.1 Workspace Structure
 
-標準構造:
-
+```text
 Workspace/
 ├── Projects/
 ├── Documents/
@@ -201,139 +502,84 @@ Workspace/
 ├── Configs/
 ├── Exports/
 └── Backups/
-
-WorkspaceはSMBでMacからアクセスできるようにする。
-
----
-
-# SMB
-
-Windows側:
-
-D:\Workspace
-
-↓
-
-SMB Share:
-
-Workspace
-
-Macからアクセス:
-
-smb://<windows-host>/Workspace
-
-LANでは直接アクセス。
-
-遠隔ではTailscale経由。
-
-TCP 445をInternetへ公開しない。
-
-SMBはバックアップではない。
+```
 
 ---
 
-# WSL2
+# 14. SMB
 
-Windows
-└── WSL2
-    └── Ubuntu
-
-Linux development environmentとして利用。
-
-Git
-Docker
-Docker Compose
-CLI tools
-
-を配置する。
-
-Linux filesystemを必要以上にWindows filesystemへ置かない。
-
-Docker volumeや大量のsmall filesは
-WSL2側filesystemを優先する。
-
----
-
-# Docker
-
-Docker ComposeをSource of Truthとする。
-
-Dockgeは管理UIとして利用可能。
-
-Docker services:
-
-docker/compose/
-
-に定義する。
-
----
-
-# Remote Access
-
-Tailscaleを基本とする。
-
-Internetへ直接、
-
-RDP
-SSH
-SMB
-Docker management
-Dockge
-
-などを公開しない。
-
----
-
-# Remote Windows
-
-通常のWindows作業:
-
-Mac
-↓
-Tailscale
-↓
-Windows App / RDP
-↓
-Windows
-
-ゲーム:
-
-Mac
-↓
-Tailscale
-↓
-Parsec
-↓
-Windows
-↓
-Steam / Games
-
----
-
-# SSH
-
-Mac
-↓
-Tailscale
-↓
-Windows SSH
-↓
-WSL2 Ubuntu
-
-という開発経路を作る。
-
-可能ならSSH key authenticationを利用。
-
-PasswordAuthenticationは無効化する。
-
----
-
-# winctl
-
-Windows Personal Cloudを操作するCLI。
+MacなどからWindows WorkspaceへアクセスするためにSMBを利用する。
 
 例:
 
+```text
+Windows
+    D:\Workspace
+        ↓
+      SMB
+        ↓
+Mac
+```
+
+SMBはファイルアクセスのために使用する。
+
+SMBそのものをBackupとして扱わない。
+
+---
+
+# 15. Remote Access
+
+## Mac
+
+用途によってアクセス方法を使い分ける。
+
+### CLI
+
+SSH
+
+### GUI
+
+Windows App / RDP
+
+### Gaming
+
+Parsec
+
+### Files
+
+SMB
+
+### Network
+
+Tailscale
+
+---
+
+# 16. Tailscale
+
+TailscaleをRemote Networkの基本とする。
+
+インターネットへ直接ポートを公開しない。
+
+公開しないもの:
+
+```text
+RDP
+SSH
+SMB
+Docker API
+Windows管理画面
+```
+
+---
+
+# 17. winctl
+
+Windows PCを管理するCLIを作る。
+
+コマンド:
+
+```text
 winctl status
 winctl mode
 winctl game
@@ -352,40 +598,15 @@ winctl restore
 winctl sync
 winctl logs
 winctl history
+```
 
 ---
 
-# winctl status
+# 18. System Modes
 
-例:
+Windows PCにはModeを持たせる。
 
-Windows Personal Cloud
-────────────────────────────
-MODE       : SERVER
-STATE      : READY
-
-CPU        : 8%
-GPU        : 4%
-RAM        : 18 / 64 GB
-GPU VRAM   : 3 / 16 GB
-
-Tailscale  : ✓
-OpenSSH    : ✓
-WSL2       : ✓
-Docker     : ✓
-Parsec     : ✓
-SMB        : ✓
-
-Workspace  : D:\Workspace
-Backup     : OK
-
-Health     : HEALTHY
-Uptime     : 3d 12h
-
----
-
-# Modes
-
+```text
 READY
 GAME
 WORK
@@ -393,34 +614,694 @@ SERVER
 SLEEP
 DEGRADED
 ERROR
-
-状態遷移を管理する。
-
-GAME:
-
-不要なserver/serviceを停止可能。
-
-WORK:
-
-開発・Adobe等のWindows作業を優先。
-
-SERVER:
-
-Docker services等を優先。
-
-SLEEP:
-
-実際のWindows Sleepではなく、
-不要なサービスを停止したidle状態を基本とする。
+```
 
 ---
 
-# Discord
+## READY
 
-将来的にDiscord Botから操作できるようにする。
+通常状態。
+
+---
+
+## GAME
+
+ゲーム中。
+
+自動Hibernateを行わない。
+
+---
+
+## WORK
+
+開発・作業状態。
+
+---
+
+## SERVER
+
+サーバー稼働状態。
+
+必要なサービスを起動する。
+
+---
+
+## SLEEP
+
+Hibernateへ移行する直前の状態。
+
+---
+
+## DEGRADED
+
+一部サービスが利用できないがWindows自体は動作している。
+
+---
+
+## ERROR
+
+重大なエラーが発生している。
+
+---
+
+# 19. Power Management
+
+Windows PCを必要なときだけ起動する。
+
+---
+
+# 20. Night Mode
+
+毎日21:00にWindows PCの状態を確認する。
+
+```text
+21:00
+   ↓
+ゲーム起動確認
+   ↓
+ゲームあり ──→ 何もしない
+   │
+   └─ ゲームなし
+          ↓
+      winctl sleep
+          ↓
+      Services停止
+          ↓
+      WSL2停止
+          ↓
+      Docker停止
+          ↓
+      Hibernate
+```
+
+---
+
+# 21. Game Detection
+
+ゲーム起動中かどうかを確認する。
+
+ゲームは設定ファイルで管理する。
 
 例:
 
+```text
+config/games.json
+```
+
+```json
+{
+  "games": [
+    "game.exe",
+    "another-game.exe"
+  ]
+}
+```
+
+未知のプロセスを勝手にゲーム扱いしない。
+
+---
+
+# 22. Automatic Hibernate
+
+21:00にゲームが起動していなければ、
+
+```text
+winctl sleep
+```
+
+を実行する。
+
+`winctl sleep`では、Hibernate前に必要な停止処理を行う。
+
+例:
+
+```text
+Check active games
+        ↓
+Check backup
+        ↓
+Check important processes
+        ↓
+Stop Docker
+        ↓
+Stop WSL2
+        ↓
+Stop unnecessary services
+        ↓
+Prepare Windows
+        ↓
+Hibernate
+```
+
+---
+
+# 23. Safety Check
+
+以下の状態では自動Hibernateを行わないことを検討する。
+
+* ゲーム起動中
+* Backup実行中
+* Windows Update中
+* 重要な処理実行中
+* ファイルコピー中
+* Dockerで重要なJob実行中
+* ユーザーが明示的に禁止している場合
+
+---
+
+# 24. Hibernate
+
+最終的なNight ModeではWindows Hibernateを第一候補とする。
+
+目的:
+
+* CPU負荷を停止
+* GPU負荷を停止
+* WSL2停止
+* Docker停止
+* ファン停止
+* ディスプレイ停止
+* 消費電力削減
+
+ただし、Wake-on-LANがHibernateから正常に動作するかを実機で検証する。
+
+---
+
+# 25. Power State Fallback
+
+WoLの対応状況によって使用するPower Stateを変更可能にする。
+
+優先順位:
+
+```text
+1. Hibernate + Wake-on-LAN
+2. Sleep + Wake-on-LAN
+3. その他の低電力状態
+4. Shutdown + 手動Power On
+```
+
+設定ファイルから変更可能にする。
+
+例:
+
+```text
+night_mode = hibernate
+```
+
+---
+
+# 26. Wake Flow
+
+Wakeは自動では行わない。
+
+ユーザーがDiscordから、
+
+```text
+/win wake
+```
+
+を実行した場合のみWakeする。
+
+```text
+Discord
+    ↓
+Raspberry Pi
+    ↓
+Wake-on-LAN
+    ↓
+Alienware
+    ↓
+Windows
+    ↓
+Network
+    ↓
+Tailscale
+    ↓
+SSH
+    ↓
+WSL2
+    ↓
+Docker
+    ↓
+Health Check
+    ↓
+READY
+```
+
+---
+
+# 27. Boot Recovery
+
+Windows起動後に必要なサービスを自動的に復旧する。
+
+例:
+
+```text
+Windows Boot
+    ↓
+Tailscale
+    ↓
+OpenSSH
+    ↓
+WSL2
+    ↓
+Docker
+    ↓
+Services
+    ↓
+Health Check
+```
+
+不要なサービスは起動しない。
+
+---
+
+# 28. Monitoring
+
+`winctl status`で以下を確認する。
+
+Hardware:
+
+* CPU
+* GPU
+* RAM
+* VRAM
+* Temperature
+* Disk
+* Network
+
+Services:
+
+* Tailscale
+* SSH
+* WSL2
+* Docker
+* SMB
+* Parsec
+
+System:
+
+* Uptime
+* Power State
+* Current Mode
+* Last Sleep
+* Last Wake
+* Last Error
+
+---
+
+# 29. Health Check
+
+Health Checkを実装する。
+
+確認項目:
+
+```text
+Windows
+Tailscale
+SSH
+WSL2
+Docker
+SMB
+Workspace
+Disk
+Network
+```
+
+問題がある場合:
+
+```text
+DEGRADED
+```
+
+または
+
+```text
+ERROR
+```
+
+にする。
+
+---
+
+# 30. Backup
+
+役割を明確に分離する。
+
+```text
+GitHub
+= Environment Definition
+
+Windows + Workspace
+= Live Data
+
+External SSD / NAS
+= Backup
+```
+
+GitHubをBackupの代わりにしない。
+
+---
+
+# 31. GitHub Security
+
+GitHubへ以下を保存しない。
+
+```text
+.env
+API Keys
+Passwords
+Tokens
+SSH Private Keys
+Tailscale Secrets
+Discord Bot Token
+Cookies
+Personal Credentials
+```
+
+`.gitignore`を適切に設定する。
+
+必要なSecretはWindowsまたはRaspberry Pi側で管理する。
+
+---
+
+# 32. Raspberry Pi Security
+
+Raspberry PiからWindowsへの接続は必要最小限にする。
+
+Discord Botから任意のShellを実行できないようにする。
+
+許可する操作:
+
+```text
+status
+wake
+```
+
+など、明示的に実装したCommandのみ。
+
+---
+
+# 33. Installer
+
+最終的には、
+
+```text
+install.exe
+```
+
+または、
+
+```text
+bootstrap.ps1
+```
+
+から環境を構築できるようにする。
+
+---
+
+# 34. Bootstrap Flow
+
+```text
+Win + R
+    ↓
+Bootstrap
+    ↓
+GitHub Repository
+    ↓
+Administrator Check
+    ↓
+OS Detection
+    ↓
+Architecture Detection
+    ↓
+Storage Detection
+    ↓
+Config Load
+    ↓
+Windows Base Setup
+    ↓
+winget
+    ↓
+Git
+    ↓
+WSL2
+    ↓
+Ubuntu
+    ↓
+Docker
+    ↓
+Tailscale
+    ↓
+OpenSSH
+    ↓
+SMB
+    ↓
+Parsec
+    ↓
+Workspace
+    ↓
+Firewall
+    ↓
+winctl
+    ↓
+Scheduled Tasks
+    ↓
+Services
+    ↓
+Health Check
+```
+
+---
+
+# 35. Installer Requirements
+
+Installerは以下を満たす。
+
+## Idempotent
+
+何度実行しても壊れない。
+
+```text
+install
+install
+install
+```
+
+を繰り返しても問題ない。
+
+---
+
+## Resumable
+
+再起動が必要になった場合、
+
+```text
+Restart
+    ↓
+Bootstrap Resume
+```
+
+できるようにする。
+
+---
+
+## Safe
+
+既存データを勝手に削除しない。
+
+特に、
+
+```text
+Workspace
+Projects
+Documents
+Media
+Backups
+```
+
+を自動削除しない。
+
+---
+
+# 36. Project Structure
+
+Repository:
+
+```text
+windows-personal-cloud/
+├── README.md
+├── produce.txt
+│
+├── docs/
+│   └── architecture-v2.md
+│
+├── installer/
+│
+├── scripts/
+│
+├── winctl/
+│
+├── controller/
+│   ├── README.md
+│   ├── bot/
+│   ├── wake/
+│   ├── health/
+│   ├── config/
+│   └── install.sh
+│
+├── docker/
+│
+└── config/
+    ├── games.json
+    ├── system.json
+    └── services.json
+```
+
+---
+
+# 37. Configuration
+
+ハードコードを避ける。
+
+例:
+
+```text
+Workspace Path
+Windows Hostname
+Windows IP
+Tailscale Hostname
+MAC Address
+Game Processes
+Night Mode
+Sleep Mode
+Discord User IDs
+Discord Role IDs
+```
+
+などをConfigで管理する。
+
+---
+
+# 38. Logging
+
+Windows:
+
+```text
+C:\ProgramData\winctl\logs\
+```
+
+Raspberry Pi:
+
+```text
+/var/log/windows-controller/
+```
+
+などにログを保存する。
+
+ログには、
+
+* Wake
+* Sleep
+* Boot
+* Health Check
+* Error
+* Command
+* Service Status
+
+を記録する。
+
+---
+
+# 39. Discord Notifications
+
+重要なイベントをDiscordへ通知する。
+
+例:
+
+```text
+💤 Windows PC entered Hibernate.
+```
+
+```text
+⚡ Wake requested.
+```
+
+```text
+🟢 Windows PC is ready.
+```
+
+```text
+🔴 Windows PC failed health check.
+```
+
+---
+
+# 40. Failure Handling
+
+Windows起動に失敗した場合、
+
+Raspberry Piから一定時間Health Checkを行う。
+
+例:
+
+```text
+Wake
+ ↓
+30 sec
+ ↓
+Check
+ ↓
+60 sec
+ ↓
+Check
+ ↓
+120 sec
+ ↓
+Check
+```
+
+一定時間応答しなければ、
+
+```text
+Windows failed to become ready.
+```
+
+をDiscordへ通知する。
+
+---
+
+# 41. Raspberry Pi Failure
+
+Raspberry Piが停止するとRemote Wakeが利用できなくなる。
+
+そのためv1では、
+
+* systemd自動起動
+* 自動再起動
+* watchdog
+
+などを検討する。
+
+ただし、複雑な冗長構成は最初から作らない。
+
+---
+
+# 42. No Arbitrary Remote Shell
+
+Discordから、
+
+```text
+/win exec powershell ...
+```
+
+のような機能は実装しない。
+
+必要な操作は専用Commandとして実装する。
+
+例:
+
+```text
 /win status
 /win wake
 /win sleep
@@ -429,297 +1310,316 @@ SLEEP:
 /win server
 /win update
 /win reboot
-
-任意のPowerShellを実行できる機能は作らない。
-
-Allowlist方式。
+```
 
 ---
 
-# Monitoring
+# 43. Development Phases
 
-最低限:
+## Phase 1
 
-CPU
-GPU
-RAM
-VRAM
-temperature
-disk
-network
-Docker
-Tailscale
-SSH
-SMB
+Windows Base
 
-を確認できるようにする。
-
-まずはwinctl statusを中心に実装。
-
-Prometheus/Grafanaは後から追加可能。
+* winget
+* Git
+* PowerShell
+* Windows設定
+* Firewall
 
 ---
 
-# Backup
+## Phase 2
 
-役割を分離する。
+Remote Access
 
-GitHub
-=
-環境定義
-
-Windows + Workspace
-=
-現在のデータ
-
-External SSD / NAS
-=
-バックアップ
-
-winctl backup
-
-で、
-
-Projects
-Documents
-Assets
-Media
-Services
-Configs
-Database dumps
-
-などをバックアップ。
-
-GitHubへ個人データを保存しない。
+* Tailscale
+* SSH
+* Windows App
+* Parsec
+* SMB
 
 ---
 
-# Restore
+## Phase 3
 
-winctl restore
+Linux
 
-またはBootstrapから、
+* WSL2
+* Ubuntu
+* Docker
+* Docker Compose
 
-GitHub
-↓
-environment
-↓
-Windows
-↓
+---
+
+## Phase 4
+
 Workspace
-↓
-Backup
-↓
-restore
 
-という流れで復元できるようにする。
-
----
-
-# Sync
-
-winctl sync
-
-で、
-
-・現在の環境情報収集
-・package list
-・Windows configuration
-・WSL configuration
-・Docker configuration
-・winctl configuration
-
-などを安全な形式でexport。
-
-秘密情報を除外。
-
-Git statusを確認。
-
-必要ならcommit/push。
+* Workspace creation
+* SMB
+* Permissions
+* Folder structure
 
 ---
 
-# Installer
+## Phase 5
 
-最終的には、
-
-install.exe
-
-またはそれに近い
-one-click installer
-
-を作る。
-
-ただし開発初期は
-PowerShell scriptを直接利用してよい。
-
-重要なのはEXE化より、
-
-「完全自動」
-「再実行可能」
-「失敗から復旧可能」
-
-であること。
-
----
-
-# Installer Flow
-
-install.exe
-↓
-Administrator check
-↓
-GitHub repository取得
-↓
-Windows configuration
-↓
-winget
-↓
-PowerShell
-↓
-Git
-↓
-WSL2
-↓
-Ubuntu
-↓
-Docker
-↓
-Tailscale
-↓
-OpenSSH
-↓
-SMB
-↓
-Parsec
-↓
-Workspace
-↓
-Firewall
-↓
 winctl
-↓
-Docker services
-↓
+
+```text
+status
+mode
+game
+work
+server
+sleep
+wake
+doctor
+services
+disk
+logs
+```
+
+---
+
+## Phase 6
+
+Power Management
+
+* Game Detection
+* 21:00 Scheduled Task
+* Sleep
+* Hibernate
+* Wake-on-LAN
+* Boot Recovery
+
+---
+
+## Phase 7
+
+Raspberry Pi Controller
+
+* Raspberry Pi setup
+* Discord Bot
+* Wake-on-LAN
+* Health Check
+* Boot Monitor
+* Discord Notifications
+
+---
+
+## Phase 8
+
+Discord
+
+```text
+/win status
+/win wake
+/win sleep
+/win game
+/win work
+/win server
+/win update
+/win reboot
+```
+
+---
+
+## Phase 9
+
+Monitoring
+
+* CPU
+* GPU
+* RAM
+* VRAM
+* Temperature
+* Disk
+* Network
+* Docker
+* Tailscale
+* SSH
+* SMB
+
+---
+
+## Phase 10
+
+Backup
+
+* External SSD
+* NAS
+* Backup scripts
+* Restore scripts
+* Backup verification
+
+---
+
+## Phase 11
+
+Installer
+
+* Bootstrap
+* Idempotency
+* Resume
+* Reboot handling
+* Error handling
+* Clean install support
+
+---
+
+## Phase 12
+
+Clean Install Test
+
+実際にWindowsを再インストールする。
+
+```text
+Clean Windows
+    ↓
+Bootstrap
+    ↓
+GitHub
+    ↓
+Automatic Setup
+    ↓
+Reboot
+    ↓
+Resume
+    ↓
 Health Check
-↓
+```
+
+最終的に、
+
+```text
+Windows PC
++ WSL2
++ Docker
++ Tailscale
++ SSH
++ SMB
++ Parsec
++ Workspace
++ winctl
++ Raspberry Pi Controller
++ Discord
+```
+
+が復元されることを確認する。
+
+---
+
+# 44. Final Target
+
+最終的な使用イメージ:
+
+### PCを使いたい
+
+```text
+Discord
+    ↓
+/win wake
+    ↓
+Raspberry Pi
+    ↓
+Wake-on-LAN
+    ↓
+Alienware
+    ↓
+Windows
+    ↓
 READY
+```
+
+### 作業する
+
+```text
+Mac
+ ↓
+Tailscale
+ ↓
+SSH / RDP / SMB / Parsec
+ ↓
+Windows
+```
+
+### 夜になる
+
+```text
+21:00
+ ↓
+Game Check
+ ↓
+ゲームなし
+ ↓
+winctl sleep
+ ↓
+WSL2停止
+ ↓
+Docker停止
+ ↓
+Services停止
+ ↓
+Hibernate
+```
+
+### ゲーム中
+
+```text
+21:00
+ ↓
+Game Check
+ ↓
+Game Running
+ ↓
+何もしない
+```
+
+### 翌日
+
+```text
+Discord
+ ↓
+/win wake
+ ↓
+Raspberry Pi
+ ↓
+Wake-on-LAN
+ ↓
+Alienware
+ ↓
+Windows
+ ↓
+Services Recovery
+ ↓
+Health Check
+ ↓
+READY
+```
 
 ---
 
-# Reboot Handling
+# 45. Design Principles
 
-Windows設定によっては再起動が必要になる。
+このプロジェクトでは以下を原則とする。
 
-再起動後に、
+1. GitHubをEnvironment DefinitionのSource of Truthとする。
+2. SecretをGitHubへ保存しない。
+3. Installerは何度実行しても壊れないようにする。
+4. Installerは再起動後にResumeできるようにする。
+5. 重要なデータを自動削除しない。
+6. Remote AccessはTailscaleを基本とする。
+7. RDP/SSH/SMBをInternetへ直接公開しない。
+8. Raspberry PiはAlways-on Controllerとして使用する。
+9. Raspberry Piでは重い処理を行わない。
+10. Windows PCは必要なときだけ起動する。
+11. 21:00にゲーム中でなければHibernateする。
+12. WakeはDiscordから手動で行う。
+13. Wake-on-LANはAlienware m17 R3の実機で検証する。
+14. WoLが利用できない場合は別のPower Stateを検討する。
+15. Discordから任意のShellコマンドを実行できるようにしない。
+16. 最初から過剰な複雑性を導入しない。
+17. すべての機能は段階的に追加する。
+18. 最終的にClean Installから完全復元できる状態を目指す。
 
-「どこまで終わったか」
-
-を自動判定して続きを実行する。
-
-state fileなどを利用してよい。
-
-例:
-
-bootstrap-state.json
-
-{
-  "windows": "completed",
-  "wsl": "completed",
-  "docker": "completed",
-  "tailscale": "pending"
-}
-
----
-
-# Safety
-
-絶対に、
-
-既存ディスクを勝手にformatしない。
-
-既存データを勝手に削除しない。
-
-秘密情報をGitHubへpushしない。
-
-InternetへRDP/SSH/SMBを公開しない。
-
-管理者権限を必要以上に利用しない。
-
----
-
-# Project Structure
-
-windows-personal-cloud/
-
-├── bootstrap/
-├── installer/
-├── scripts/
-├── winctl/
-├── docker/
-├── config/
-├── docs/
-├── tests/
-├── .github/
-├── README.md
-├── produce.txt
-└── .gitignore
-
----
-
-# Development Policy
-
-Claude Codeはこのproduce.txtを仕様書として扱う。
-
-実装時は、
-
-1. 現在のWindows環境を調査
-2. 小さいscriptから実装
-3. 手動で動作確認
-4. idempotency確認
-5. error handling追加
-6. test追加
-7. bootstrapへ統合
-8. 最後にinstaller化
-
-の順番で進める。
-
-一度に巨大なinstallerを作らない。
-
----
-
-# Definition of Done
-
-以下を満たしたらv1完成。
-
-[ ] Windows初期状態からBootstrapを実行できる
-[ ] GitHubから自動取得できる
-[ ] 管理者権限を適切に扱える
-[ ] WSL2が自動構築される
-[ ] Ubuntuが構築される
-[ ] Dockerが構築される
-[ ] Tailscaleが構築される
-[ ] SSHが構築される
-[ ] SMBが構築される
-[ ] Workspaceが作成される
-[ ] winctl statusが動く
-[ ] winctl doctorが動く
-[ ] 再起動後に続きから実行できる
-[ ] 途中失敗後に再実行できる
-[ ] secretsがGitHubへ入らない
-[ ] 既存データを破壊しない
-[ ] clean Windowsから再構築できる
-
-最終目標:
-
-「Windowsを入れ直した。
-
-Win + R。
-
-Bootstrap。
-
-あとは待つだけ。
-
-自分のWindows Personal Cloudが戻ってきた。」
-
-これを実現する。
