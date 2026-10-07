@@ -3,7 +3,7 @@
     "name": "Alienware m17 R3",
     "hostname": "alienware",
     "tailscale_hostname": "alienware",
-    "mac_address": "",
+    "mac_address": "cc:48:3a:5c:90:cd",
     "ethernet_adapter": "Ethernet"
   },
   "workspace": {
