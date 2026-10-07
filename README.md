@@ -16,13 +16,19 @@ Discord                  = Remote Control Interface (/win status, /win wake, ...
 
 ### 1. Windows
 
-クリーンな Windows で `Win + R` →
+クリーンな Windows で、スタートを右クリック →「ターミナル (管理者)」で:
 
-```
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/takoyakidath/windows-personal-cloud/main/bootstrap.ps1 | iex"
+```powershell
+winget install --id Git.Git -e --source winget
+git clone https://github.com/takoyakidath/windows-personal-cloud.git C:\ProgramData\winctl\repo
+Set-ExecutionPolicy -Scope Process Bypass
+C:\ProgramData\winctl\repo\bootstrap.ps1
 ```
 
-管理者権限に昇格 → Git → `C:\ProgramData\winctl\repo` に clone → `installer\install.ps1` を実行する。
+（`git` が見つからない場合はターミナルを開き直す。）`bootstrap.ps1` が `installer\install.ps1` を実行する。
+
+> `irm <URL> | iex` 形式（ダウンロードしてそのまま実行）は Microsoft Defender に
+> `Trojan:Win32/Commando` として検出される。マルウェアと同じ手口なので使わない。
 再起動が必要な場合は自動で再起動し、ログオン後に続きから再開する。何度実行しても安全。
 
 最後に表示される **Manual actions** だけ手で行う（Tailscale ログイン、Parsec ログイン、WSL パスワード、BIOS など）。

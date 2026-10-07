@@ -1,38 +1,36 @@
 # Windows Personal Cloud - bootstrap (product.txt §33, §34)
 #
-# On a fresh Windows install, press Win + R and run:
+# On a fresh Windows install, from Terminal (Admin):
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/takoyakidath/windows-personal-cloud/main/bootstrap.ps1 | iex"
+#   winget install --id Git.Git -e --source winget
+#   git clone https://github.com/takoyakidath/windows-personal-cloud.git C:\ProgramData\winctl\repo
+#   Set-ExecutionPolicy -Scope Process Bypass
+#   C:\ProgramData\winctl\repo\bootstrap.ps1
 #
-# It elevates itself, installs Git, clones this repository to C:\ProgramData\winctl\repo
-# and hands over to installer\install.ps1. Safe to run any number of times.
+# Do not use the `irm <url> | iex` download cradle: Microsoft Defender rightly flags it as
+# Trojan:Win32/Commando. This script updates the checkout and hands over to installer\install.ps1.
+# Safe to run any number of times.
 
 $ErrorActionPreference = 'Stop'
 $RepoUrl = if ($env:WPC_REPO_URL) { $env:WPC_REPO_URL } else { 'https://github.com/takoyakidath/windows-personal-cloud.git' }
 $Branch = if ($env:WPC_BRANCH) { $env:WPC_BRANCH } else { 'main' }
-$RawBootstrap = 'https://raw.githubusercontent.com/takoyakidath/windows-personal-cloud/main/bootstrap.ps1'
 $HomeDir = Join-Path $env:ProgramData 'winctl'
 $RepoDir = Join-Path $HomeDir 'repo'
 
 function Write-Step { param([string]$Message) Write-Host "==> $Message" -ForegroundColor Cyan }
 
-# --- Administrator check: re-launch elevated (works both from a file and from `irm | iex`) ---
+# --- Administrator check: re-launch this file elevated ---
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Step 'Requesting Administrator rights'
-    $self = $PSCommandPath
-    if (-not $self) {
-        $self = Join-Path $env:TEMP 'wpc-bootstrap.ps1'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $RawBootstrap -OutFile $self -UseBasicParsing
+    if (-not $PSCommandPath) {
+        throw 'Run bootstrap.ps1 as a file from Terminal (Admin); see the comment at the top of this script.'
     }
+    Write-Step 'Requesting Administrator rights'
     try {
-        Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$self`"") -ErrorAction Stop
+        Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$PSCommandPath`"") -ErrorAction Stop
     } catch {
-        Write-Host ''
         Write-Host "Could not get Administrator rights: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host 'Open an elevated terminal instead (right-click Start > Terminal (Admin)) and run:' -ForegroundColor Yellow
-        Write-Host "  irm $RawBootstrap | iex" -ForegroundColor Yellow
+        Write-Host 'Right-click Start > Terminal (Admin), then run this script again.' -ForegroundColor Yellow
     }
     return
 }

@@ -14,6 +14,11 @@ Mac ── Tailscale ── SSH / RDP / SMB / Parsec ───────┘
 
 ## 判断と理由
 
+### Bootstrap はファイルから実行する
+product.txt は「Win + R → Bootstrap」を想定していたが、`powershell -ExecutionPolicy Bypass -Command "irm URL | iex"` は
+マルウェアと同じダウンロード・クレードルで、Microsoft Defender が `Trojan:Win32/Commando` として検出する（実機で確認）。
+Defender の除外は作らず、winget で Git → clone → `bootstrap.ps1` をファイルとして実行する 4 行の手順にした。
+
 ### Windows 側は PowerShell 5.1 互換
 クリーンインストール直後の Windows には Windows PowerShell 5.1 しかない。bootstrap / installer / winctl を
 すべて 5.1 で動くように書き（三項演算子・`??`・`-AsHashtable` を使わない）、CI で 5.1 上の Pester を回す。
