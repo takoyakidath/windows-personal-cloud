@@ -1,0 +1,32 @@
+# Secrets — never commit (product.txt §31)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+id_*
+!id_*.pub
+secrets.json
+cookies*
+
+# Local-only configuration
+config/*.local.json
+controller/config/controller.json
+controller/config/controller.env
+
+# Runtime
+*.log
+logs/
+state.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

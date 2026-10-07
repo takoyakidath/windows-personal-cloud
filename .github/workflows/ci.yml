@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  controller:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+      - run: bash -n install.sh && bash -n ../installer/wsl/install-docker.sh
+
+  winctl:
+    # Real Windows PowerShell 5.1: the version a freshly installed Windows has.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pester (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          Install-Module Pester -MinimumVersion 5.5 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -MinimumVersion 5.5
+          $r = Invoke-Pester -Path winctl/tests -Output Detailed -PassThru
+          if ($r.FailedCount -gt 0) { exit 1 }
+      - name: Parse all scripts (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $bad = 0
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            foreach ($e in $errors) { $bad++; Write-Host "$($_.FullName):$($e.Extent.StartLineNumber) $($e.Message)" }
+          }
+          if ($bad -gt 0) { exit 1 }

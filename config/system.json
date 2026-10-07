@@ -1,0 +1,61 @@
+{
+  "machine": {
+    "name": "Alienware m17 R3",
+    "hostname": "alienware",
+    "tailscale_hostname": "alienware",
+    "mac_address": "",
+    "ethernet_adapter": "Ethernet"
+  },
+  "workspace": {
+    "path": "D:\\Workspace",
+    "fallback_path": "C:\\Workspace",
+    "smb_share_name": "Workspace",
+    "folders": [
+      "Projects",
+      "Documents",
+      "Assets",
+      "Media",
+      "Games",
+      "Services",
+      "Configs",
+      "Exports",
+      "Backups"
+    ]
+  },
+  "network": {
+    "allowed_remote_addresses": ["100.64.0.0/10", "LocalSubnet"]
+  },
+  "remote": {
+    "ssh": true,
+    "rdp": true,
+    "smb": true,
+    "parsec": true
+  },
+  "wsl": {
+    "distro": "Ubuntu-24.04",
+    "default_user": "takoyaki"
+  },
+  "power": {
+    "night_mode": "hibernate",
+    "night_check_time": "21:00",
+    "sleep_grace_seconds": 45,
+    "inhibit_processes": ["robocopy", "TiWorker", "MoUsoCoreWorker"],
+    "inhibit_docker_label": "wpc.inhibit-sleep=true"
+  },
+  "backup": {
+    "target": "E:\\Backups\\windows-personal-cloud",
+    "mirror": false,
+    "exclude_dirs": ["node_modules", ".venv", "__pycache__", ".next", "target"]
+  },
+  "packages": [
+    "Git.Git",
+    "Microsoft.PowerShell",
+    "Tailscale.Tailscale",
+    "Parsec.Parsec",
+    "Microsoft.WindowsTerminal"
+  ],
+  "repository": {
+    "url": "https://github.com/takoyakidath/windows-personal-cloud.git",
+    "branch": "main"
+  }
+}

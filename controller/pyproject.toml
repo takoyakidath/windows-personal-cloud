@@ -1,0 +1,10 @@
+[project]
+name = "windows-controller"
+version = "0.1.0"
+description = "Always-on Raspberry Pi controller for the Windows Personal Cloud PC"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"

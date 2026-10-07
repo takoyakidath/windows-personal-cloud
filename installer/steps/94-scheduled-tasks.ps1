@@ -1,0 +1,55 @@
+# Scheduled tasks (all under \winctl\):
+#   WinCtl-Night          daily at power.night_check_time: game check -> winctl sleep
+#   WinCtl-RecoverLogon   at logon: boot recovery
+#   WinCtl-RecoverResume  on resume from sleep/hibernate (Power-Troubleshooter event 1): recovery
+#   WinCtl-Sleep/Update/Reboot/Shutdown   on demand, started by `winctl remote` so they outlive the SSH session
+#   WinCtl-WslKeepAlive   on demand: keeps the WSL distro (and Docker) running
+# Tasks run as the interactive user because WSL is per-user.
+@{
+    Name = 'Scheduled tasks'
+    Run  = {
+        param($Ctx)
+        $path = '\winctl\'
+        $winctl = Join-Path (Get-WinctlPath Bin) 'winctl.cmd'
+        $principal = New-ScheduledTaskPrincipal -UserId $Ctx.UserId -LogonType Interactive -RunLevel Highest
+
+        function New-WinctlAction { param([string]$Arguments)
+            New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$winctl`" $Arguments"
+        }
+        function Register-WinctlTask { param([string]$Name, $Action, $Trigger, $Settings)
+            $params = @{ TaskName = $Name; TaskPath = $path; Action = $Action; Principal = $principal; Settings = $Settings; Force = $true }
+            if ($Trigger) { $params.Trigger = $Trigger }
+            Register-ScheduledTask @params | Out-Null
+            Write-Done "$path$Name"
+        }
+
+        $default = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 2) -MultipleInstances IgnoreNew
+        # Never run a missed 21:00 check at the next boot: that would hibernate right after waking.
+        $night = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
+        $night.StartWhenAvailable = $false
+        $forever = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+
+        $at = [datetime]::ParseExact($Ctx.System.power.night_check_time, 'HH:mm', $null)
+        Register-WinctlTask -Name 'WinCtl-Night' -Action (New-WinctlAction 'night') -Trigger (New-ScheduledTaskTrigger -Daily -At $at) -Settings $night
+
+        $logon = New-ScheduledTaskTrigger -AtLogOn -User $Ctx.UserId
+        $logon.Delay = 'PT30S'
+        Register-WinctlTask -Name 'WinCtl-RecoverLogon' -Action (New-WinctlAction 'recover --reason boot') -Trigger $logon -Settings $default
+
+        $class = Get-CimClass -ClassName MSFT_TaskEventTrigger -Namespace Root/Microsoft/Windows/TaskScheduler
+        $resume = $class | New-CimInstance -ClientOnly
+        $resume.Enabled = $true
+        $resume.Delay = 'PT20S'
+        $resume.Subscription = '<QueryList><Query Id="0" Path="System"><Select Path="System">*[System[Provider[@Name=''Microsoft-Windows-Power-Troubleshooter''] and EventID=1]]</Select></Query></QueryList>'
+        Register-WinctlTask -Name 'WinCtl-RecoverResume' -Action (New-WinctlAction 'recover --reason resume') -Trigger $resume -Settings $default
+
+        foreach ($cmd in 'sleep', 'update', 'reboot', 'shutdown') {
+            $name = 'WinCtl-' + (Get-Culture).TextInfo.ToTitleCase($cmd)
+            Register-WinctlTask -Name $name -Action (New-WinctlAction $cmd) -Trigger $null -Settings $default
+        }
+
+        $keepAlive = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $($Ctx.System.wsl.distro) -u root -- sleep infinity"
+        Register-WinctlTask -Name 'WinCtl-WslKeepAlive' -Action $keepAlive -Trigger $null -Settings $forever
+        return 'ok'
+    }
+}

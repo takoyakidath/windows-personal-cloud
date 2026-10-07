@@ -1,0 +1,17 @@
+{
+  "services": {
+    "tailscale": { "type": "windows_service", "name": "Tailscale" },
+    "ssh":       { "type": "windows_service", "name": "sshd" },
+    "smb":       { "type": "windows_service", "name": "LanmanServer" },
+    "parsec":    { "type": "windows_service", "name": "Parsec" },
+    "wsl":       { "type": "wsl" },
+    "docker":    { "type": "wsl_systemd", "unit": "docker" }
+  },
+  "modes": {
+    "READY":  { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
+    "WORK":   { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
+    "SERVER": { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [], "compose": [] },
+    "GAME":   { "start": ["tailscale", "parsec"], "stop": ["docker", "wsl"] }
+  },
+  "sleep_stop": ["docker", "wsl", "parsec"]
+}

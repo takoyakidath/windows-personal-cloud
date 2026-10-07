@@ -1,0 +1,28 @@
+[Unit]
+Description=Windows Personal Cloud controller (Discord bot, Wake-on-LAN, health)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+User=windows-controller
+Group=windows-controller
+WorkingDirectory=@CONTROLLER_DIR@
+EnvironmentFile=/etc/windows-controller/controller.env
+ExecStart=/opt/windows-controller/venv/bin/python -m bot /etc/windows-controller/controller.json
+NotifyAccess=main
+TimeoutStartSec=300
+WatchdogSec=120
+Restart=always
+RestartSec=10
+
+# Hardening: the controller only needs the network, its state and its logs.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/var/lib/windows-controller /var/log/windows-controller
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
