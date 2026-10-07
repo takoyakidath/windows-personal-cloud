@@ -66,13 +66,13 @@ jobs:
       - name: Install (1st run)
         shell: powershell
         run: |
-          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,92-winctl,94-scheduled-tasks -NoReboot
+          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,91-wake-on-lan,92-winctl,94-scheduled-tasks -NoReboot
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Install (2nd run, must be idempotent)
         shell: powershell
         run: |
-          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,92-winctl,94-scheduled-tasks -NoReboot
+          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,91-wake-on-lan,92-winctl,94-scheduled-tasks -NoReboot
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Verify installed state

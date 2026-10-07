@@ -315,3 +315,14 @@ Describe 'Night backup' {
         Should -Invoke Invoke-WinctlSleep -Times 1
     }
 }
+
+Describe 'LAN-only wake' {
+    It 'disarms every armed device except the Ethernet adapter' {
+        $armed = @('Killer E3000 2.5 Gigabit Ethernet Controller', 'HID-compliant mouse', 'Killer Wi-Fi 6 AX1650', '')
+        $r = @(Select-WinctlWakeDevicesToDisarm -Armed $armed -Keep 'Killer E3000 2.5 Gigabit Ethernet Controller')
+        $r | Should -Be @('HID-compliant mouse', 'Killer Wi-Fi 6 AX1650')
+    }
+    It 'treats NONE as nothing armed' {
+        @(Select-WinctlWakeDevicesToDisarm -Armed @('NONE') -Keep 'x').Count | Should -Be 0
+    }
+}

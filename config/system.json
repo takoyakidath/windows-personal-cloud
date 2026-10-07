@@ -40,6 +40,7 @@
   },
   "power": {
     "night_mode": "hibernate",
+    "lan_only_wake": true,
     "night_check_time": "21:00",
     "sleep_grace_seconds": 45,
     "inhibit_processes": [

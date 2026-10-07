@@ -40,6 +40,32 @@ function Get-WinctlInhibitingContainers {
     return @($r.Output -split "`r?`n" | Where-Object { $_ })
 }
 
+# --- Wake sources: only the built-in Ethernet (magic packet) may wake the PC. ---
+
+# Devices currently allowed to wake the PC (`powercfg /devicequery wake_armed`).
+function Get-WinctlWakeArmedDevices {
+    $out = @(& powercfg.exe /devicequery wake_armed 2>$null)
+    return @($out | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -ne 'NONE' })
+}
+
+# Pure: armed devices that are not the wake NIC and must be disarmed.
+function Select-WinctlWakeDevicesToDisarm {
+    param([string[]]$Armed = @(), [string]$Keep = '')
+    return @($Armed | Where-Object { $_ -and $_.Trim() -and $_.Trim() -ne 'NONE' -and $_.Trim() -ne $Keep })
+}
+
+# The adapter used for Wake-on-LAN: machine.ethernet_adapter, else the first built-in wired NIC.
+function Get-WinctlWakeAdapter {
+    param($SystemConfig = (Get-WinctlConfig system))
+    $adapter = Get-NetAdapter -Name $SystemConfig.machine.ethernet_adapter -Physical -ErrorAction SilentlyContinue
+    if (-not $adapter) {
+        $adapter = Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
+            Where-Object { $_.PhysicalMediaType -eq '802.3' -and $_.InterfaceDescription -notmatch 'USB' } |
+            Select-Object -First 1
+    }
+    return $adapter
+}
+
 # Pure: when a "tonight only" inhibit ends - the next 06:00.
 function Get-WinctlTonightUntil {
     param([Parameter(Mandatory)][DateTimeOffset]$Now)

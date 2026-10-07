@@ -129,6 +129,19 @@ function Get-WinctlHealthChecks {
         $checks += New-WinctlCheck -Name "Disk $($disk.drive)" -Ok ($disk.free_percent -ge 5) -Detail "$($disk.free_gb) GB free ($($disk.free_percent)%)" -Severity $severity
     }
 
+    try {
+        $nic = Get-WinctlWakeAdapter $system
+        $armed = @(Get-WinctlWakeArmedDevices)
+        $others = @()
+        $nicArmed = $false
+        if ($nic) {
+            $others = @(Select-WinctlWakeDevicesToDisarm -Armed $armed -Keep $nic.InterfaceDescription)
+            $nicArmed = ($armed -contains $nic.InterfaceDescription)
+        }
+        $detail = if (-not $nic) { 'no Ethernet adapter' } elseif (-not $nicArmed) { 'Ethernet cannot wake' } elseif ($others.Count -gt 0) { 'also: ' + ($others -join ', ') } else { 'LAN only' }
+        $checks += New-WinctlCheck -Name 'Wake' -Ok ($nicArmed -and $others.Count -eq 0) -Detail $detail -Severity 'info'
+    } catch { }
+
     $state = Get-WinctlState
     $fresh = Test-WinctlBackupFresh -LastBackup $state.last_backup -MaxAgeDays ([int](Get-WinctlProp $system.backup 'max_age_days' 7)) -Now ([DateTimeOffset]::Now)
     $checks += New-WinctlCheck -Name 'Backup' -Ok $fresh.ok -Detail $fresh.detail -Severity 'info'
