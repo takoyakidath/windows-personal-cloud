@@ -3,6 +3,10 @@
     Name = 'Packages (winget)'
     Run  = {
         param($Ctx)
+        if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+            Add-ManualAction 'Packages skipped (no winget). Update "App Installer" from the Microsoft Store, then run winctl update.'
+            return 'ok'
+        }
         foreach ($id in @($Ctx.System.packages)) {
             & winget.exe list --id $id --exact --accept-source-agreements --disable-interactivity | Out-Null
             if ($LASTEXITCODE -eq 0) { Write-Done "$id already installed"; continue }

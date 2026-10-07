@@ -22,7 +22,7 @@
             Write-Done ('Disk {0} {1} GB free' -f $d.DeviceID, [math]::Round($d.FreeSpace / 1GB, 0))
         }
         if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-            throw 'winget not found. Update "App Installer" from the Microsoft Store.'
+            Add-ManualAction 'winget not found: update "App Installer" from the Microsoft Store, then run winctl update.'
         }
         return 'ok'
     }

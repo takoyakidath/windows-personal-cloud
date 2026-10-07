@@ -16,16 +16,18 @@ Discord                  = Remote Control Interface (/win status, /win wake, ...
 
 ### 1. Windows
 
-クリーンな Windows で、スタートを右クリック →「ターミナル (管理者)」で:
+クリーンな Windows で（winget も Git も事前に不要）:
+
+1. ブラウザで https://github.com/takoyakidath/windows-personal-cloud → **Code → Download ZIP** → 展開
+2. スタートを右クリック →「Windows PowerShell (管理者)」で:
 
 ```powershell
-winget install --id Git.Git -e --source winget
-git clone https://github.com/takoyakidath/windows-personal-cloud.git C:\ProgramData\winctl\repo
 Set-ExecutionPolicy -Scope Process Bypass
-C:\ProgramData\winctl\repo\bootstrap.ps1
+& "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
 ```
 
-（`git` が見つからない場合はターミナルを開き直す。）`bootstrap.ps1` が `installer\install.ps1` を実行する。
+`bootstrap.ps1` が winget を修復（ソースのリセット）→ Git をインストール（winget が駄目なら署名を検証した Git for Windows の公式インストーラ）
+→ `C:\ProgramData\winctl\repo` に clone → そこから `installer\install.ps1` を実行する。展開した ZIP はその後消してよい。
 
 > `irm <URL> | iex` 形式（ダウンロードしてそのまま実行）は Microsoft Defender に
 > `Trojan:Win32/Commando` として検出される。マルウェアと同じ手口なので使わない。

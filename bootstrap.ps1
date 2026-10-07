@@ -1,15 +1,15 @@
 # Windows Personal Cloud - bootstrap (product.txt §33, §34)
 #
-# On a fresh Windows install, from Terminal (Admin):
+# On a fresh Windows install (nothing else needed first):
+#   1. Download the repository ZIP in a browser (GitHub > Code > Download ZIP) and extract it.
+#   2. Terminal / PowerShell (Admin):
+#        Set-ExecutionPolicy -Scope Process Bypass
+#        & "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
 #
-#   winget install --id Git.Git -e --source winget
-#   git clone https://github.com/takoyakidath/windows-personal-cloud.git C:\ProgramData\winctl\repo
-#   Set-ExecutionPolicy -Scope Process Bypass
-#   C:\ProgramData\winctl\repo\bootstrap.ps1
-#
+# It repairs winget, installs Git (winget, or the signed Git for Windows installer as a fallback),
+# clones the repo to C:\ProgramData\winctl\repo and runs installer\install.ps1 from there.
 # Do not use the `irm <url> | iex` download cradle: Microsoft Defender rightly flags it as
-# Trojan:Win32/Commando. This script updates the checkout and hands over to installer\install.ps1.
-# Safe to run any number of times.
+# Trojan:Win32/Commando. Safe to run any number of times.
 
 $ErrorActionPreference = 'Stop'
 $RepoUrl = if ($env:WPC_REPO_URL) { $env:WPC_REPO_URL } else { 'https://github.com/takoyakidath/windows-personal-cloud.git' }
@@ -38,9 +38,53 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 New-Item -ItemType Directory -Path $HomeDir -Force | Out-Null
 
-# --- winget + Git ---
-if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-    throw 'winget is not available. Update "App Installer" from the Microsoft Store, then run bootstrap again.'
+# Native command without stderr turning into a terminating error (Windows PowerShell 5.1 + 'Stop').
+function Invoke-Quiet {
+    param([string]$FilePath, [string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $FilePath @Arguments 2>&1 | Out-Null; return $LASTEXITCODE } finally { $ErrorActionPreference = $previous }
+}
+
+function Test-Winget {
+    if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) { return $false }
+    return ((Invoke-Quiet winget.exe @('search', '--id', 'Git.Git', '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity')) -eq 0)
+}
+
+# --- winget: register / reset sources (fresh Windows 10 often has a broken or missing source) ---
+function Repair-Winget {
+    if (Test-Winget) { return $true }
+    Write-Step 'Repairing winget'
+    if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+        try { Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction Stop } catch { }
+        $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User') + ";$env:LOCALAPPDATA\Microsoft\WindowsApps"
+    }
+    if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
+        Invoke-Quiet winget.exe @('source', 'reset', '--force') | Out-Null
+        Invoke-Quiet winget.exe @('source', 'update') | Out-Null
+    }
+    return (Test-Winget)
+}
+
+# Fallback: the official, signed Git for Windows installer from its GitHub release.
+function Install-GitDirect {
+    Write-Step 'Installing Git from the Git for Windows release'
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { '64-bit' }
+    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' -UseBasicParsing
+    $asset = $release.assets | Where-Object { $_.name -match "^Git-[\d.]+-$arch\.exe$" } | Select-Object -First 1
+    if (-not $asset) { throw "No Git for Windows installer found for $arch." }
+    $file = Join-Path $env:TEMP $asset.name
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $file -UseBasicParsing
+    $sig = Get-AuthenticodeSignature -FilePath $file
+    if ($sig.Status -ne 'Valid') { throw "Git installer signature is $($sig.Status); not running it." }
+    Write-Host "    signed by: $($sig.SignerCertificate.Subject)"
+    $p = Start-Process -FilePath $file -ArgumentList '/VERYSILENT', '/NORESTART', '/NOCANCEL', '/SP-', '/SUPPRESSMSGBOXES' -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw "Git installer exited with $($p.ExitCode)." }
+}
+
+$wingetOk = Repair-Winget
+if (-not $wingetOk) {
+    Write-Warning 'winget is still not usable. Update "App Installer" from the Microsoft Store later; app installs will be listed as manual actions.'
 }
 
 function Find-Git {
@@ -53,9 +97,12 @@ function Find-Git {
 
 $git = Find-Git
 if (-not $git) {
-    Write-Step 'Installing Git'
-    & winget.exe install --id Git.Git --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-    $git = Find-Git
+    if ($wingetOk) {
+        Write-Step 'Installing Git (winget)'
+        Invoke-Quiet winget.exe @('install', '--id', 'Git.Git', '--exact', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity') | Out-Null
+        $git = Find-Git
+    }
+    if (-not $git) { Install-GitDirect; $git = Find-Git }
     if (-not $git) { throw 'Git installation failed.' }
 }
 
@@ -76,5 +123,6 @@ if (Test-Path (Join-Path $RepoDir '.git')) {
 
 # --- Hand over to the installer ---
 Write-Step 'Running installer'
+# Always run the installer from the managed checkout (not from a downloaded ZIP).
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoDir 'installer\install.ps1')
 exit $LASTEXITCODE
