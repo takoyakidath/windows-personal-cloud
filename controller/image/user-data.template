@@ -1,6 +1,7 @@
 #cloud-config
 # First-boot setup for the Raspberry Pi controller (written by scripts/prepare-pi-sd.sh).
-# Contains a password *hash* only; no tokens or other secrets.
+# Contains a password *hash* only. An optional wpc-secrets.env next to this file (Discord token)
+# is moved to /etc/windows-controller/controller.env on first boot and deleted from the card.
 hostname: @HOSTNAME@
 manage_etc_hosts: true
 timezone: @TIMEZONE@
@@ -25,5 +26,12 @@ runcmd:
   for i in $(seq 1 20); do
     git clone --branch "@BRANCH@" "@REPO_URL@" /opt/windows-personal-cloud && break
     rm -rf /opt/windows-personal-cloud; sleep 15
+  done
+  for boot in /boot/firmware /boot; do
+    if [ -f "$boot/wpc-secrets.env" ]; then
+      install -d -m 0750 /etc/windows-controller
+      install -m 0600 "$boot/wpc-secrets.env" /etc/windows-controller/controller.env
+      rm -f "$boot/wpc-secrets.env"
+    fi
   done
   /opt/windows-personal-cloud/controller/install.sh --hardware-watchdog
