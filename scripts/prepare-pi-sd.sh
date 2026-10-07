@@ -53,7 +53,7 @@ else
 fi
 
 instance="wpc-$(date +%s)"
-printf 'instance-id: %s\n' "$instance" > "$bootfs/meta-data"
+printf 'dsmode: local\ninstance-id: %s\n' "$instance" > "$bootfs/meta-data"
 # Point cloud-init at the boot partition (same as Raspberry Pi Imager does); replace any previous ds=.
 cmdline="$(tr -d '\n' < "$bootfs/cmdline.txt" | sed -E 's/ ?ds=nocloud[^ ]*//')"
 printf '%s ds=nocloud;i=%s\n' "$cmdline" "$instance" > "$bootfs/cmdline.txt"
