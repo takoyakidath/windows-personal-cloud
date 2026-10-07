@@ -21,6 +21,14 @@ def test_rejects_commands_outside_allowlist():
     assert "exec" not in ALLOWED_COMMANDS
 
 
+def test_allowlist_matches_winctl_remote():
+    import pathlib, re
+    remote = (pathlib.Path(__file__).parents[2] / "winctl" / "lib" / "Remote.ps1").read_text()
+    block = remote.split("$script:RemoteAllowlist = [ordered]@{", 1)[1].split("}", 1)[0]
+    winctl = set(re.findall(r"^\s*([a-z]+)\s*=", block, re.M))
+    assert winctl == set(ALLOWED_COMMANDS)
+
+
 async def test_run_parses_json(monkeypatch):
     client = WindowsClient(CFG, known_hosts="/kh")
 

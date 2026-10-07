@@ -15,6 +15,8 @@ $script:RemoteAllowlist = [ordered]@{
     game     = 'sync'
     work     = 'sync'
     server   = 'sync'
+    stayawake  = 'sync'
+    allowsleep = 'sync'
     sleep    = 'task'
     update   = 'task'
     reboot   = 'task'
@@ -29,6 +31,18 @@ function Resolve-WinctlRemoteCommand {
     if ($trimmed -notmatch '^[a-z]+$') { return $null }
     if ($script:RemoteAllowlist.Contains($trimmed)) { return $trimmed }
     return $null
+}
+
+# on = until `inhibit off`; tonight = until the next 06:00; off = clear both.
+function Set-WinctlInhibit {
+    param([Parameter(Mandatory)][ValidateSet('on', 'off', 'tonight')][string]$Value)
+    $state = Get-WinctlState
+    $state.inhibit_sleep = ($Value -eq 'on')
+    $until = $null
+    if ($Value -eq 'tonight') { $until = (Get-WinctlTonightUntil -Now ([DateTimeOffset]::Now)).ToString('yyyy-MM-ddTHH:mm:sszzz') }
+    $state | Add-Member -NotePropertyName 'inhibit_until' -NotePropertyValue $until -Force
+    Save-WinctlState $state
+    Add-WinctlHistory -Event 'inhibit' -Detail $(if ($until) { "until $until" } else { $Value })
 }
 
 function Get-WinctlRemoteTaskName {
@@ -63,6 +77,14 @@ function Invoke-WinctlRemote {
             'ping'   { Write-WinctlJson @{ ok = $true; time = (Get-WinctlTimestamp) } }
             'status' { Write-WinctlJson (Get-WinctlStatus) }
             'doctor' { Write-WinctlJson (Get-WinctlStatus) }
+            'stayawake' {
+                Set-WinctlInhibit -Value 'tonight'
+                Write-WinctlJson (Get-WinctlStatus)
+            }
+            'allowsleep' {
+                Set-WinctlInhibit -Value 'off'
+                Write-WinctlJson (Get-WinctlStatus)
+            }
             default {
                 Set-WinctlMode $command.ToUpperInvariant()
                 $failed = @(Invoke-WinctlModeProfile $command.ToUpperInvariant())

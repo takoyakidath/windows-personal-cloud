@@ -137,20 +137,32 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
         await interaction.followup.send(_block(text))
 
     @group.command(name="wake", description="Wake the PC with Wake-on-LAN")
-    async def wake(interaction: discord.Interaction):
+    @app_commands.describe(mode="Mode to switch to once the PC is up")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="READY", value="ready"),
+        app_commands.Choice(name="GAME", value="game"),
+        app_commands.Choice(name="WORK", value="work"),
+        app_commands.Choice(name="SERVER", value="server"),
+    ])
+    async def wake(interaction: discord.Interaction, mode: app_commands.Choice[str] | None = None):
         if not await authorized(interaction):
             return
         await interaction.response.defer(thinking=True)
-        log.info("/win wake by %s", interaction.user.id)
-        obs, display, text = await status_text()
-        if obs.reachable and obs.status and display in ("READY", "WORK", "SERVER", "GAME"):
-            await interaction.followup.send(_block(f"Already up.\n\n{text}"))
-            return
+        target = mode.value if mode else None
+        log.info("/win wake mode=%s by %s", target, interaction.user.id)
         if bot.monitor.waking:
             await interaction.followup.send("⚡ Wake already in progress.")
             return
-        await interaction.followup.send("⚡ Sending Wake-on-LAN. I will post here when the PC is ready.")
-        bot.spawn(bot.monitor.wake())
+        obs, display, text = await status_text()
+        if obs.reachable and obs.status and display in ("READY", "WORK", "SERVER", "GAME"):
+            if not target:
+                await interaction.followup.send(_block(f"Already up.\n\n{text}"))
+                return
+            await interaction.followup.send(f"Already up. Switching to {target.upper()}…")
+        else:
+            suffix = f", then switch to {target.upper()}" if target else ""
+            await interaction.followup.send(f"⚡ Sending Wake-on-LAN{suffix}. I will post here when the PC is ready.")
+        bot.spawn(bot.monitor.wake(mode=target))
 
     @group.command(name="sleep", description="Stop services and hibernate (skipped while gaming / backing up)")
     async def sleep(interaction: discord.Interaction):
@@ -175,6 +187,14 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
     @group.command(name="doctor", description="Run health checks")
     async def doctor(interaction: discord.Interaction):
         await run_remote(interaction, "doctor")
+
+    @group.command(name="stay-awake", description="Skip tonight's automatic hibernate (until 06:00)")
+    async def stay_awake(interaction: discord.Interaction):
+        await run_remote(interaction, "stayawake")
+
+    @group.command(name="allow-sleep", description="Re-enable automatic hibernate")
+    async def allow_sleep(interaction: discord.Interaction):
+        await run_remote(interaction, "allowsleep")
 
     @group.command(name="update", description="git pull the config repo and re-run the installer")
     async def update(interaction: discord.Interaction):

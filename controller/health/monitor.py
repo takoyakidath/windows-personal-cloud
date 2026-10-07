@@ -10,7 +10,7 @@ from datetime import datetime
 
 from core.config import WakeConfig
 from core.state import ControllerState
-from health.status import READY_STATES, Observation, classify
+from health.status import ICONS, READY_STATES, Observation, classify
 
 log = logging.getLogger("controller.monitor")
 
@@ -58,7 +58,7 @@ class Monitor:
         return obs, display, self._record(obs, display)
 
     async def poll(self) -> None:
-        """One periodic check. Notifies on transitions into HIBERNATED and ERROR."""
+        """One periodic check. Notifies on state transitions worth knowing about."""
         if self._wake_lock.locked():
             return
         previous = self.store.load().last_state
@@ -70,12 +70,32 @@ class Monitor:
             await self.notify("💤 Windows PC entered Hibernate.")
         elif display == "ERROR":
             await self.notify("🔴 Windows PC failed health check.")
+        elif display == "OFFLINE" and previous in READY_STATES | {"DEGRADED"}:
+            # Gone without `winctl sleep`: crash, power loss, network or manual shutdown.
+            await self.notify("🔴 Windows PC went offline unexpectedly.")
+        elif display in READY_STATES and previous in ("OFFLINE", "HIBERNATED"):
+            # Came back without /win wake (power button, scheduled reboot, ...).
+            await self.notify("🟢 Windows PC is back online.")
 
-    async def wake(self) -> str:
+    async def _apply_mode(self, mode: str | None, display: str) -> str:
+        if not mode:
+            return display
+        try:
+            result = await self.client.run(mode)
+        except (RuntimeError, ValueError) as e:
+            await self.notify(f"🔴 Switching to {mode.upper()} failed: {e}")
+            return display
+        new = str(result.get("state") or display)
+        self._record(Observation(True, result), new)
+        await self.notify(f"{ICONS.get(new, '⚪')} Mode: {new}")
+        return new
+
+    async def wake(self, mode: str | None = None) -> str:
+        """Wake the PC; optionally switch to `mode` (ready/game/work/server) once it is up."""
         async with self._wake_lock:
             obs, display, _ = await self.observe()
             if obs.reachable and display in READY_STATES:
-                return display
+                return await self._apply_mode(mode, display)
 
             self.store.save(replace(self.store.load(), waking=True))
             try:
@@ -88,7 +108,7 @@ class Monitor:
                     log.info("wake check: %s", display)
                     if obs.reachable and display in READY_STATES:
                         await self.notify("🟢 Windows PC is ready.")
-                        return display
+                        return await self._apply_mode(mode, display)
                     if not obs.reachable and self.wake_config.resend_packet:
                         self.send_wol()
             finally:

@@ -84,6 +84,13 @@ def format_status(name: str, display_state: str, obs: Observation, state: Contro
     if workspace is not None:
         lines.append(f"Workspace: {'OK' if workspace.get('ok') else 'MISSING'}")
 
+    backup = next((c for c in s.get("checks") or [] if c.get("name") == "Backup"), None)
+    if backup is not None:
+        lines.append(f"Last Backup: {backup.get('detail')}" + ("" if backup.get("ok") else " ⚠️"))
+    if s.get("inhibit_sleep"):
+        until = _hhmm(s.get("inhibit_until"))
+        lines.append(f"Auto-sleep: blocked until {until}" if until else "Auto-sleep: blocked")
+
     failed = [c["name"] for c in s.get("checks") or [] if not c.get("ok") and c.get("severity") != "info"]
     if failed:
         lines += ["", "Problems: " + ", ".join(failed)]

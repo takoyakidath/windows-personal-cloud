@@ -41,3 +41,95 @@ jobs:
             foreach ($e in $errors) { $bad++; Write-Host "$($_.FullName):$($e.Extent.StartLineNumber) $($e.Message)" }
           }
           if ($bad -gt 0) { exit 1 }
+
+  windows-integration:
+    # Runs real installer steps on a throwaway Windows VM, twice (idempotency), then checks the
+    # SSH forced command end to end. WSL / Docker / WoL / winget cannot run here.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare CI config and keys
+        shell: powershell
+        run: |
+          $keys = Join-Path $env:RUNNER_TEMP 'keys'
+          New-Item -ItemType Directory -Path $keys -Force | Out-Null
+          cmd /c "ssh-keygen -q -t ed25519 -N """" -f $keys\controller"
+          Copy-Item "$keys\controller.pub" config\ssh\controller.pub
+          @{
+            workspace = @{ path = 'C:\wpc-ci\Workspace' }
+            backup    = @{ target = 'C:\wpc-ci\Backups' }
+            remote    = @{ rdp = $false }
+          } | ConvertTo-Json | Set-Content config\system.local.json
+
+      - name: Install (1st run)
+        shell: powershell
+        run: |
+          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,92-winctl,94-scheduled-tasks -NoReboot
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Install (2nd run, must be idempotent)
+        shell: powershell
+        run: |
+          & .\installer\install.ps1 -Only 60-openssh,70-workspace,75-smb,90-firewall,92-winctl,94-scheduled-tasks -NoReboot
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Verify installed state
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Assert($cond, $msg) { if (-not $cond) { throw "FAILED: $msg" }; Write-Host "ok  $msg" }
+
+          foreach ($f in 'Projects', 'Documents', 'Backups') { Assert (Test-Path "C:\wpc-ci\Workspace\$f") "workspace folder $f" }
+          Assert ((Get-SmbShare -Name Workspace).Path -eq 'C:\wpc-ci\Workspace') 'SMB share points to the workspace'
+          Assert ((Get-SmbShare -Name Workspace).EncryptData) 'SMB share is encrypted'
+
+          $addr = (Get-NetFirewallRule -Name OpenSSH-Server-In-TCP | Get-NetFirewallAddressFilter).RemoteAddress
+          Assert ($addr -contains '100.64.0.0/10' -and $addr -contains 'LocalSubnet') "SSH firewall scope ($($addr -join ', '))"
+
+          foreach ($t in 'WinCtl-Night', 'WinCtl-RecoverLogon', 'WinCtl-RecoverResume', 'WinCtl-Sleep', 'WinCtl-WslKeepAlive') {
+            Assert (Get-ScheduledTask -TaskPath '\winctl\' -TaskName $t -ErrorAction SilentlyContinue) "task $t"
+          }
+          Assert ((Get-ScheduledTask -TaskPath '\winctl\' -TaskName 'WinCtl-Night').Settings.StartWhenAvailable -eq $false) 'night task does not run late'
+
+          $keys = Get-Content C:\ProgramData\ssh\administrators_authorized_keys
+          Assert (@($keys | Where-Object { $_ -like '# BEGIN windows-personal-cloud*' }).Count -eq 1) 'one managed key block after two runs'
+          Assert (@($keys | Where-Object { $_ -like 'command=*winctl.cmd remote*' }).Count -eq 1) 'controller key has forced command'
+
+          $status = C:\ProgramData\winctl\bin\winctl.cmd status --json | Out-String | ConvertFrom-Json
+          Assert ($status.name -eq 'Alienware m17 R3') "winctl status --json (state $($status.state))"
+          C:\ProgramData\winctl\bin\winctl.cmd doctor
+          Write-Host "doctor exit $LASTEXITCODE (DEGRADED expected: no WSL/Tailscale here)"
+
+      - name: Verify SSH forced command (controller key)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          function Assert($cond, $msg) { if (-not $cond) { throw "FAILED: $msg" }; Write-Host "ok  $msg" }
+          $key = Join-Path $env:RUNNER_TEMP 'keys\controller'
+          $opts = @('-i', $key, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=NUL', "$env:USERNAME@localhost")
+
+          $out = & ssh @opts status 2>&1 | Out-String
+          Write-Host $out
+          $json = ($out -split "`r?`n" | Where-Object { $_.Trim().StartsWith('{') } | Select-Object -Last 1) | ConvertFrom-Json
+          Assert ($json.name -eq 'Alienware m17 R3') 'status over SSH returns winctl JSON'
+
+          $out = & ssh @opts whoami 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Host $out
+          Assert ($out -match 'command not allowed' -and $code -ne 0) "arbitrary command rejected (exit $code)"
+
+          $out = & ssh @opts 'status; whoami' 2>&1 | Out-String
+          Assert ($out -match 'command not allowed') 'command chaining rejected'
+
+          $out = & ssh @opts stayawake 2>&1 | Out-String
+          $json = ($out -split "`r?`n" | Where-Object { $_.Trim().StartsWith('{') } | Select-Object -Last 1) | ConvertFrom-Json
+          Assert ($json.inhibit_sleep -eq $true -and $json.inhibit_until) "stayawake sets inhibit until $($json.inhibit_until)"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: winctl-logs
+          path: C:\ProgramData\winctl\logs\

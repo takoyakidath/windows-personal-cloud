@@ -16,7 +16,7 @@ from health.status import Observation
 # Mirror of $RemoteAllowlist in winctl/lib/Remote.ps1.
 ALLOWED_COMMANDS = frozenset({
     "ping", "status", "doctor", "ready", "game", "work", "server",
-    "sleep", "update", "reboot", "shutdown",
+    "stayawake", "allowsleep", "sleep", "update", "reboot", "shutdown",
 })
 
 _SLOW = {"ready": 240, "game": 240, "work": 240, "server": 240}

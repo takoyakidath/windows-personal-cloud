@@ -40,6 +40,23 @@ function Get-WinctlInhibitingContainers {
     return @($r.Output -split "`r?`n" | Where-Object { $_ })
 }
 
+# Pure: when a "tonight only" inhibit ends - the next 06:00.
+function Get-WinctlTonightUntil {
+    param([Parameter(Mandatory)][DateTimeOffset]$Now)
+    $six = New-Object DateTimeOffset ($Now.Year, $Now.Month, $Now.Day, 6, 0, 0, $Now.Offset)
+    if ($Now -lt $six) { return $six }
+    return $six.AddDays(1)
+}
+
+# Pure: is automatic sleep blocked by the user (permanently or until a time)?
+function Test-WinctlInhibited {
+    param([Parameter(Mandatory)]$State, [Parameter(Mandatory)][DateTimeOffset]$Now)
+    if (Get-WinctlProp $State 'inhibit_sleep' $false) { return $true }
+    $until = Get-WinctlProp $State 'inhibit_until' $null
+    if (-not $until) { return $false }
+    try { return ([DateTimeOffset]::Parse([string]$until) -gt $Now) } catch { return $false }
+}
+
 # Returns a list of human-readable reasons why the PC must not sleep now (empty = safe).
 function Get-WinctlSleepBlockers {
     param([switch]$Night)
@@ -48,7 +65,7 @@ function Get-WinctlSleepBlockers {
     $reasons = @()
 
     if ($Night -and $state.mode -eq 'GAME') { $reasons += 'mode is GAME' }
-    if ($state.inhibit_sleep) { $reasons += 'auto-sleep inhibited by user (winctl inhibit off to clear)' }
+    if (Test-WinctlInhibited -State $state -Now ([DateTimeOffset]::Now)) { $reasons += 'auto-sleep inhibited by user (winctl inhibit off to clear)' }
 
     foreach ($g in Get-WinctlRunningGames) { $reasons += "game running: $g" }
     foreach ($l in Get-WinctlActiveLocks) { $reasons += "job in progress: $l" }
@@ -120,6 +137,12 @@ function Invoke-WinctlNight {
         Write-WinctlLog -Event 'night' -Message ('Game running, staying on: ' + ($games -join ', '))
         Add-WinctlHistory -Event 'night' -Detail ('skip: game ' + ($games -join ', '))
         return
+    }
+    # product.txt §22 "Check backup": optionally back up first (skipped when the drive is not connected).
+    $backup = (Get-WinctlConfig system).backup
+    if ((Get-WinctlProp $backup 'before_night_sleep' $false) -and -not (Test-WinctlInhibited -State (Get-WinctlState) -Now ([DateTimeOffset]::Now))) {
+        try { Invoke-WinctlBackup }
+        catch { Write-WinctlLog -Level WARN -Event 'night' -Message "Backup before sleep failed: $($_.Exception.Message)" }
     }
     Add-WinctlHistory -Event 'night' -Detail 'no game; sleeping'
     Invoke-WinctlSleep -Night | Out-Null

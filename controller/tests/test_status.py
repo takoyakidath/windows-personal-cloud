@@ -63,3 +63,13 @@ def test_format_hibernated_shows_last_seen_time():
 def test_format_offline():
     text = format_status("Alienware m17 R3", "OFFLINE", Observation(False), ControllerState())
     assert text.splitlines() == ["🔴 Alienware m17 R3", "", "State: OFFLINE"]
+
+
+def test_format_shows_backup_age_and_sleep_block():
+    status = dict(READY_STATUS)
+    status["checks"] = READY_STATUS["checks"] + [{"name": "Backup", "ok": False, "detail": "9 days ago", "severity": "info"}]
+    status["inhibit_sleep"] = True
+    status["inhibit_until"] = "2026-10-08T06:00:00+09:00"
+    lines = format_status("PC", "READY", Observation(True, status), ControllerState()).splitlines()
+    assert "Last Backup: 9 days ago ⚠️" in lines
+    assert "Auto-sleep: blocked until 06:00" in lines

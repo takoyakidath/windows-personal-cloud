@@ -238,3 +238,80 @@ Describe 'winctl entry point' {
         }
     }
 }
+
+Describe 'Inhibit' {
+    BeforeAll { $script:Jst = [TimeSpan]::FromHours(9) }
+
+    It 'tonight ends at the next 06:00' {
+        $evening = New-Object DateTimeOffset (2026, 10, 7, 20, 30, 0, $script:Jst)
+        (Get-WinctlTonightUntil -Now $evening) | Should -Be (New-Object DateTimeOffset (2026, 10, 8, 6, 0, 0, $script:Jst))
+        $earlyMorning = New-Object DateTimeOffset (2026, 10, 8, 2, 0, 0, $script:Jst)
+        (Get-WinctlTonightUntil -Now $earlyMorning) | Should -Be (New-Object DateTimeOffset (2026, 10, 8, 6, 0, 0, $script:Jst))
+    }
+
+    It 'is active before inhibit_until and expires after it' {
+        $state = [pscustomobject]@{ inhibit_sleep = $false; inhibit_until = '2026-10-08T06:00:00+09:00' }
+        Test-WinctlInhibited -State $state -Now (New-Object DateTimeOffset (2026, 10, 7, 21, 0, 0, $script:Jst)) | Should -BeTrue
+        Test-WinctlInhibited -State $state -Now (New-Object DateTimeOffset (2026, 10, 8, 7, 0, 0, $script:Jst)) | Should -BeFalse
+    }
+
+    It 'permanent inhibit ignores the time' {
+        $state = [pscustomobject]@{ inhibit_sleep = $true; inhibit_until = $null }
+        Test-WinctlInhibited -State $state -Now ([DateTimeOffset]::Now) | Should -BeTrue
+    }
+
+    It 'Set-WinctlInhibit tonight blocks night sleep and off clears it' {
+        Mock Get-WinctlRunningProcessNames { @() }
+        Mock Get-WinctlActiveLocks { @() }
+        Mock Get-WinctlInhibitingContainers { @() }
+        Set-WinctlInhibit -Value 'tonight'
+        (Get-WinctlState).inhibit_until | Should -Not -BeNullOrEmpty
+        (@(Get-WinctlSleepBlockers -Night) -join ';') | Should -Match 'inhibited'
+        Set-WinctlInhibit -Value 'off'
+        @(Get-WinctlSleepBlockers -Night).Count | Should -Be 0
+    }
+
+    It 'stayawake and allowsleep are allowlisted for the controller' {
+        Resolve-WinctlRemoteCommand 'stayawake' | Should -Be 'stayawake'
+        Resolve-WinctlRemoteCommand 'allowsleep' | Should -Be 'allowsleep'
+    }
+}
+
+Describe 'Backup freshness' {
+    BeforeAll { $script:Now = New-Object DateTimeOffset (2026, 10, 7, 12, 0, 0, [TimeSpan]::FromHours(9)) }
+
+    It 'never backed up is not fresh' {
+        (Test-WinctlBackupFresh -LastBackup $null -Now $script:Now).ok | Should -BeFalse
+    }
+    It 'reports age in days' {
+        $r = Test-WinctlBackupFresh -LastBackup '2026-10-04T10:00:00+09:00' -MaxAgeDays 7 -Now $script:Now
+        $r.ok | Should -BeTrue
+        $r.detail | Should -Be '3 days ago'
+    }
+    It 'is stale after max_age_days' {
+        (Test-WinctlBackupFresh -LastBackup '2026-09-01T10:00:00+09:00' -MaxAgeDays 7 -Now $script:Now).ok | Should -BeFalse
+    }
+}
+
+Describe 'Night backup' {
+    BeforeEach {
+        Mock Get-WinctlRunningGames { @() }
+        Mock Invoke-WinctlSleep { $true }
+        Mock Invoke-WinctlBackup { }
+        Set-WinctlInhibit -Value 'off'
+    }
+    AfterEach { Remove-Item -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -ErrorAction SilentlyContinue }
+
+    It 'does not back up unless before_night_sleep is enabled' {
+        Invoke-WinctlNight
+        Should -Invoke Invoke-WinctlBackup -Times 0
+        Should -Invoke Invoke-WinctlSleep -Times 1
+    }
+    It 'backs up first when enabled, and still sleeps if the backup fails' {
+        Set-Content -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -Value '{"backup":{"before_night_sleep":true}}'
+        Mock Invoke-WinctlBackup { throw 'drive missing' }
+        Invoke-WinctlNight
+        Should -Invoke Invoke-WinctlBackup -Times 1
+        Should -Invoke Invoke-WinctlSleep -Times 1
+    }
+}

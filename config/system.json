@@ -23,7 +23,10 @@
     ]
   },
   "network": {
-    "allowed_remote_addresses": ["100.64.0.0/10", "LocalSubnet"]
+    "allowed_remote_addresses": [
+      "100.64.0.0/10",
+      "LocalSubnet"
+    ]
   },
   "remote": {
     "ssh": true,
@@ -39,13 +42,25 @@
     "night_mode": "hibernate",
     "night_check_time": "21:00",
     "sleep_grace_seconds": 45,
-    "inhibit_processes": ["robocopy", "TiWorker", "MoUsoCoreWorker"],
+    "inhibit_processes": [
+      "robocopy",
+      "TiWorker",
+      "MoUsoCoreWorker"
+    ],
     "inhibit_docker_label": "wpc.inhibit-sleep=true"
   },
   "backup": {
     "target": "E:\\Backups\\windows-personal-cloud",
     "mirror": false,
-    "exclude_dirs": ["node_modules", ".venv", "__pycache__", ".next", "target"]
+    "max_age_days": 7,
+    "before_night_sleep": false,
+    "exclude_dirs": [
+      "node_modules",
+      ".venv",
+      "__pycache__",
+      ".next",
+      "target"
+    ]
   },
   "packages": [
     "Git.Git",

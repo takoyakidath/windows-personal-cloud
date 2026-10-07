@@ -50,7 +50,7 @@ winctl doctor              ヘルスチェック詳細 (exit 1 = DEGRADED, 2 = E
 winctl ready|game|work|server   モード切替 (config/services.json の profile を適用)
 winctl sleep [--force]     サービス停止 → WSL 停止 → Hibernate (ゲーム中・Backup 中などは中止)
 winctl wake                サービス復旧して READY へ (起動・復帰時は自動実行)
-winctl inhibit on|off      21:00 の自動 Hibernate を禁止 / 許可
+winctl inhibit on|tonight|off   21:00 の自動 Hibernate を禁止 (tonight = 翌朝 6:00 まで) / 許可
 winctl services [start|stop NAME]
 winctl disk
 winctl backup [verify]     Workspace → 外付け SSD / NAS (robocopy、既定では削除しない)
@@ -68,12 +68,15 @@ winctl logs | history
 | Command | 動作 |
 | --- | --- |
 | `/win status` | 状態表示（READY / DEGRADED / ERROR / HIBERNATED / OFFLINE …） |
-| `/win wake` | Wake-on-LAN → 30s / 60s / 120s … で確認 → READY になったら通知 |
+| `/win wake [mode:GAME]` | Wake-on-LAN → 30s / 60s / 120s … で確認 → READY で通知（mode 指定時はそのモードへ切替） |
 | `/win sleep` | `winctl sleep`（安全チェックあり） |
 | `/win ready` `/win game` `/win work` `/win server` | モード切替 |
+| `/win stay-awake` / `/win allow-sleep` | 今夜の自動 Hibernate を中止（翌朝 6:00 まで）/ 再開 |
 | `/win doctor` | ヘルスチェック |
 | `/win update` | `winctl update` |
 | `/win reboot confirm:True` / `/win shutdown confirm:True` | 再起動 / シャットダウン |
+
+Pi は状態の変化も通知する: Hibernate 移行、ヘルスチェック失敗、**予期しないオフライン**（READY から突然応答なし）、手動起動での復帰。
 
 任意のコマンドは実行できない。Pi の SSH 鍵は Windows 側で `winctl remote` に強制され、allowlist 外は拒否される。
 

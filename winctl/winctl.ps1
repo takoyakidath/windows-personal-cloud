@@ -31,7 +31,7 @@ winctl - Windows Personal Cloud controller
                             Switch mode and start/stop services for it
   sleep [--force]           Stop services and enter the configured power state
   wake                      Recover services after boot/resume and return to READY
-  inhibit on|off            Block / allow automatic night sleep
+  inhibit on|tonight|off    Block automatic night sleep (tonight = until 06:00) / allow it
   services [start|stop NAME]
                             List services or control one
   disk                      Disk usage
@@ -134,10 +134,13 @@ try {
         'wake'     { Invoke-WinctlRecover -Reason (Get-Option '--reason' 'manual') | Out-Null }
         'recover'  { Invoke-WinctlRecover -Reason (Get-Option '--reason' 'boot') | Out-Null }
         'inhibit' {
-            $on = ($Rest.Count -eq 0 -or $Rest[0] -eq 'on')
-            Set-WinctlStateField -Name 'inhibit_sleep' -Value $on | Out-Null
-            Add-WinctlHistory -Event 'inhibit' -Detail "$on"
-            Write-Host ('Automatic sleep is now ' + $(if ($on) { 'BLOCKED' } else { 'ALLOWED' }))
+            $value = 'on'
+            if ($Rest.Count -gt 0) { $value = $Rest[0].ToLowerInvariant() }
+            Set-WinctlInhibit -Value $value
+            $state = Get-WinctlState
+            if ($value -eq 'off') { Write-Host 'Automatic sleep is now ALLOWED' }
+            elseif ($state.inhibit_until) { Write-Host "Automatic sleep is BLOCKED until $($state.inhibit_until)" }
+            else { Write-Host 'Automatic sleep is now BLOCKED' }
         }
         'services' {
             if ($Rest.Count -ge 2 -and $Rest[0] -eq 'start') { Start-WinctlService $Rest[1] }

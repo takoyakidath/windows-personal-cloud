@@ -135,6 +135,8 @@ function Get-WinctlState {
         last_wake     = $null
         last_error    = $null
         inhibit_sleep = $false
+        inhibit_until = $null
+        last_backup   = $null
     }
     $path = Get-WinctlPath State
     if (-not (Test-Path -LiteralPath $path)) { return $default }

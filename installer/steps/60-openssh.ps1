@@ -6,8 +6,10 @@
         param($Ctx)
         if (-not $Ctx.System.remote.ssh) { Write-Done 'Disabled in config'; return 'ok' }
 
-        $cap = Get-WindowsCapability -Online -Name 'OpenSSH.Server*' | Select-Object -First 1
-        if ($cap.State -ne 'Installed') {
+        # Newer Windows ships sshd preinstalled; otherwise add the optional capability.
+        if (-not (Get-Service -Name sshd -ErrorAction SilentlyContinue)) {
+            $cap = Get-WindowsCapability -Online -Name 'OpenSSH.Server*' | Select-Object -First 1
+            if (-not $cap) { throw 'OpenSSH.Server capability not found on this Windows.' }
             Write-Done 'Installing OpenSSH.Server capability'
             Add-WindowsCapability -Online -Name $cap.Name | Out-Null
         }

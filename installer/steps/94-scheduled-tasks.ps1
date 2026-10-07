@@ -4,7 +4,8 @@
 #   WinCtl-RecoverResume  on resume from sleep/hibernate (Power-Troubleshooter event 1): recovery
 #   WinCtl-Sleep/Update/Reboot/Shutdown   on demand, started by `winctl remote` so they outlive the SSH session
 #   WinCtl-WslKeepAlive   on demand: keeps the WSL distro (and Docker) running
-# Tasks run as the interactive user because WSL is per-user.
+# Tasks run as the interactive user because WSL is per-user, through `conhost.exe --headless`
+# so no console window pops up (e.g. over a game, or a permanent one for the WSL keep-alive).
 @{
     Name = 'Scheduled tasks'
     Run  = {
@@ -13,8 +14,11 @@
         $winctl = Join-Path (Get-WinctlPath Bin) 'winctl.cmd'
         $principal = New-ScheduledTaskPrincipal -UserId $Ctx.UserId -LogonType Interactive -RunLevel Highest
 
+        function New-HiddenAction { param([string]$CommandLine)
+            New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless $CommandLine"
+        }
         function New-WinctlAction { param([string]$Arguments)
-            New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$winctl`" $Arguments"
+            New-HiddenAction "cmd.exe /c `"$winctl`" $Arguments"
         }
         function Register-WinctlTask { param([string]$Name, $Action, $Trigger, $Settings)
             $params = @{ TaskName = $Name; TaskPath = $path; Action = $Action; Principal = $principal; Settings = $Settings; Force = $true }
@@ -48,7 +52,7 @@
             Register-WinctlTask -Name $name -Action (New-WinctlAction $cmd) -Trigger $null -Settings $default
         }
 
-        $keepAlive = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $($Ctx.System.wsl.distro) -u root -- sleep infinity"
+        $keepAlive = New-HiddenAction "wsl.exe -d $($Ctx.System.wsl.distro) -u root -- sleep infinity"
         Register-WinctlTask -Name 'WinCtl-WslKeepAlive' -Action $keepAlive -Trigger $null -Settings $forever
         return 'ok'
     }

@@ -129,6 +129,10 @@ function Get-WinctlHealthChecks {
         $checks += New-WinctlCheck -Name "Disk $($disk.drive)" -Ok ($disk.free_percent -ge 5) -Detail "$($disk.free_gb) GB free ($($disk.free_percent)%)" -Severity $severity
     }
 
+    $state = Get-WinctlState
+    $fresh = Test-WinctlBackupFresh -LastBackup $state.last_backup -MaxAgeDays ([int](Get-WinctlProp $system.backup 'max_age_days' 7)) -Now ([DateTimeOffset]::Now)
+    $checks += New-WinctlCheck -Name 'Backup' -Ok $fresh.ok -Detail $fresh.detail -Severity 'info'
+
     return [pscustomobject]@{ checks = $checks; services = [pscustomobject]$serviceStatus }
 }
 
@@ -152,7 +156,9 @@ function Get-WinctlStatus {
         last_sleep     = $state.last_sleep
         last_wake      = $state.last_wake
         last_error     = $state.last_error
-        inhibit_sleep  = $state.inhibit_sleep
+        inhibit_sleep  = (Test-WinctlInhibited -State $state -Now ([DateTimeOffset]::Now))
+        inhibit_until  = $state.inhibit_until
+        last_backup    = $state.last_backup
         time           = Get-WinctlTimestamp
     }
 }
@@ -191,6 +197,11 @@ function Format-WinctlStatus {
     if ($Status.last_sleep) { $lines += "Last Sleep: $($Status.last_sleep)" }
     if ($Status.last_wake) { $lines += "Last Wake: $($Status.last_wake)" }
     if ($Status.last_error) { $lines += "Last Error: $($Status.last_error)" }
-    if ($Status.inhibit_sleep) { $lines += 'Auto-sleep: INHIBITED' }
+    $backup = $Status.checks | Where-Object { $_.name -eq 'Backup' } | Select-Object -First 1
+    if ($backup) { $lines += "Last Backup: $($backup.detail)" }
+    if ($Status.inhibit_sleep) {
+        if ($Status.inhibit_until -and -not (Get-WinctlState).inhibit_sleep) { $lines += "Auto-sleep: BLOCKED until $($Status.inhibit_until)" }
+        else { $lines += 'Auto-sleep: BLOCKED' }
+    }
     return ($lines -join [Environment]::NewLine)
 }

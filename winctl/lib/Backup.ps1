@@ -69,8 +69,19 @@ function Invoke-WinctlBackup {
     }
     $marker = [ordered]@{ time = (Get-WinctlTimestamp); host = $env:COMPUTERNAME; source = $paths.Source; robocopy_exit = $code }
     $marker | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $paths.Root 'last-backup.json') -Encoding UTF8
+    Set-WinctlStateField -Name 'last_backup' -Value (Get-WinctlTimestamp) | Out-Null
     Add-WinctlHistory -Event 'backup' -Detail "ok (robocopy exit $code)"
     Write-WinctlLog -Event 'backup' -Message "Backup finished (robocopy exit $code). Log: $log"
+}
+
+# Pure: is the last successful backup recent enough? Returns @{ ok; detail }.
+function Test-WinctlBackupFresh {
+    param($LastBackup, [int]$MaxAgeDays = 7, [Parameter(Mandatory)][DateTimeOffset]$Now)
+    if (-not $LastBackup) { return [pscustomobject]@{ ok = $false; detail = 'never backed up' } }
+    try { $age = $Now - [DateTimeOffset]::Parse([string]$LastBackup) } catch { return [pscustomobject]@{ ok = $false; detail = 'unknown' } }
+    $days = [math]::Floor($age.TotalDays)
+    $detail = if ($days -lt 1) { 'today' } elseif ($days -eq 1) { '1 day ago' } else { "$days days ago" }
+    return [pscustomobject]@{ ok = ($age.TotalDays -le $MaxAgeDays); detail = $detail }
 }
 
 # Lists files that differ between workspace and backup without copying anything.

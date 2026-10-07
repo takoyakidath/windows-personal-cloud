@@ -65,12 +65,17 @@ status を取得しているので最後の mode=SLEEP を記録でき、応答�
 - `power.inhibit_processes`（robocopy、Windows Update の TiWorker など）
 - `wpc.inhibit-sleep=true` ラベル付きの Docker コンテナ
 
+`backup.before_night_sleep: true` にすると、Hibernate の前に `winctl backup` を実行する（ドライブ未接続や失敗時はスキップして Hibernate する）。
+`winctl doctor` / `status` は最終 Backup からの日数を表示し、`backup.max_age_days`（既定 7）を超えると警告する。
+
 21:00 のタスクは `StartWhenAvailable = false`。電源オフで逃した 21:00 チェックを翌朝の起動直後に実行して、
 起きた直後に Hibernate してしまうのを防ぐ。
 
 ### 起動 / 復帰時のリカバリ
 - ログオン時: `WinCtl-RecoverLogon`
 - Sleep / Hibernate からの復帰時: `WinCtl-RecoverResume`（System ログの Power-Troubleshooter Event ID 1）
+
+タスクは `conhost.exe --headless` 経由で起動し、ゲーム中などにコンソール画面が出ないようにする（WSL keep-alive も同様）。
 
 どちらも `winctl recover` を実行する。ネットワーク待ち → mode が SLEEP なら READY に戻す → モードのサービスを起動 →
 ヘルスチェック → 通知（webhook を設定している場合）。
@@ -107,4 +112,5 @@ restore は削除せず、Workspace 側の新しいファイルを上書きし�
 | WinCtl-WslKeepAlive で Docker が動き続けるか | `winctl work` → 数分後に `winctl status` |
 | 復帰イベント（Power-Troubleshooter 1）でのリカバリ | Hibernate → 復帰 → `winctl history` に `wake resume` |
 | SSH forced command（Windows OpenSSH） | Pi から `ssh -i … user@pc status` |
+| `conhost.exe --headless` でタスクのウィンドウが出ないこと | 21:00 / ログオン時に画面を確認 |
 | CPU 温度 | WMI で取れない機種では null（GPU 温度は nvidia-smi） |
