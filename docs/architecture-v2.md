@@ -103,6 +103,12 @@ robocopy で Workspace → `backup.target\Workspace`。既定では **宛先の�
 restore は削除せず、Workspace 側の新しいファイルを上書きしない（`/XO`）うえ、`--yes` が必要。
 実行中は lock を作り、Night Mode が Hibernate しないようにする。
 
+### WoL 専用の直結ケーブル
+Pi の eth0 と Alienware の内蔵 Ethernet を 1 本で直結し、WoL 専用にしている（普段の通信は両方とも Wi-Fi）。
+ルーターがないので Windows 側の Ethernet は「識別されていないネットワーク」になるが、magic packet は L2 ブロードキャストなので IP は不要。
+Pi の eth0 には `install.sh --wol-link 10.99.0.1/24` で固定 IP を付け、`windows.broadcast` を `10.99.0.255` にすることで、
+magic packet が Wi-Fi ではなく必ず eth0 から出るようにしている。`windows.host` は PC の Wi-Fi 側 IP（DHCP 予約推奨）。
+
 ### Raspberry Pi
 - Python 3.11 + discord.py。WoL・SSH・状態判定は標準ライブラリだけで実装する。
 - systemd `Type=notify` + `WatchdogSec=120` + `Restart=always`。必要なら `install.sh --hardware-watchdog` で Pi 自体の HW watchdog も使う。

@@ -2,6 +2,11 @@
 
 Night Mode で使う電源状態を決めるための手順。Alienware と Raspberry Pi を有線 LAN で同じネットワークにつなぎ、AC 電源を接続しておく。
 
+## 構成
+
+Pi の eth0 ⇔ Alienware の内蔵 Ethernet を直結（WoL 専用）。Pi は `install.sh --wol-link 10.99.0.1/24`、
+`controller.json` の `windows.broadcast` は `10.99.0.255`。手動送信は `python3 -m wake <MAC> 10.99.0.255`。
+
 ## 準備
 
 1. [bios.md](bios.md) の BIOS 設定

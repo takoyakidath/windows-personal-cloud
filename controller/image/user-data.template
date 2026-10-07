@@ -34,4 +34,4 @@ runcmd:
       rm -f "$boot/wpc-secrets.env"
     fi
   done
-  /opt/windows-personal-cloud/controller/install.sh --hardware-watchdog
+  /opt/windows-personal-cloud/controller/install.sh --hardware-watchdog --wol-link 10.99.0.1/24

@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 # Raspberry Pi controller installer (product.txt §5, §41). Idempotent; run as root:
-#   sudo ./controller/install.sh [--hardware-watchdog]
+#   sudo ./controller/install.sh [--hardware-watchdog] [--wol-link 10.99.0.1/24]
+#
+#   --wol-link CIDR   eth0 is a direct cable to the PC used only for Wake-on-LAN: give it this
+#                     static address (no gateway) and set windows.broadcast in controller.json to
+#                     that subnet's broadcast (e.g. 10.99.0.255) so magic packets leave via eth0.
+# Both settings persist, so later runs (e.g. from update.sh) need not repeat the options.
 set -euo pipefail
+
+HARDWARE_WATCHDOG=0
+WOL_LINK=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --hardware-watchdog) HARDWARE_WATCHDOG=1; shift ;;
+    --wol-link) WOL_LINK="${2:?--wol-link needs an address like 10.99.0.1/24}"; shift 2 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
 
 CONTROLLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_USER=windows-controller
@@ -49,7 +64,24 @@ systemctl enable windows-controller >/dev/null
 # Daily git pull (fast-forward only) + reinstall when controller/ changed: controller/update.sh
 systemctl enable --now windows-controller-update.timer >/dev/null
 
-if [[ "${1:-}" == "--hardware-watchdog" ]]; then
+if [[ -n "$WOL_LINK" ]]; then
+  echo "==> eth0 WoL link ($WOL_LINK)"
+  # Reuse whatever NetworkManager profile owns eth0 (cloud-init creates netplan-eth0), else create one.
+  con="$(nmcli -t -f NAME,DEVICE connection show | awk -F: '$2=="eth0"{print $1; exit}')"
+  if [[ -z "$con" ]]; then
+    con="$(nmcli -t -f NAME connection show | grep -x -e 'netplan-eth0' -e 'wol-link' | head -1 || true)"
+  fi
+  if [[ -z "$con" ]]; then
+    nmcli connection add type ethernet ifname eth0 con-name wol-link >/dev/null
+    con=wol-link
+  fi
+  nmcli connection modify "$con" ipv4.method manual ipv4.addresses "$WOL_LINK" ipv4.gateway "" \
+    ipv4.never-default yes ipv6.method disabled connection.autoconnect yes
+  nmcli connection up "$con" >/dev/null 2>&1 || echo "    eth0 not up yet (cable unplugged?); it will come up with the link"
+  echo "    $con: $WOL_LINK (set windows.broadcast to this subnet's broadcast address)"
+fi
+
+if [[ $HARDWARE_WATCHDOG -eq 1 ]]; then
   # Reboot the Pi itself if the kernel hangs.
   mkdir -p /etc/systemd/system.conf.d
   printf '[Manager]\nRuntimeWatchdogSec=15\n' > /etc/systemd/system.conf.d/watchdog.conf
