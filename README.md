@@ -35,6 +35,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 最後に表示される **Manual actions** だけ手で行う（Tailscale ログイン、Parsec ログイン、WSL パスワード、BIOS など）。
 
+再インストール時のチェックリスト: [docs/reinstall.md](docs/reinstall.md)
+
 ### 2. Raspberry Pi
 
 ```bash
