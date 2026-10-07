@@ -10,7 +10,7 @@
 
         $exe = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
         $state = $null
-        try { $state = (& $exe status --json 2>$null | Out-String | ConvertFrom-Json).BackendState } catch { }
+        try { $state = ((Invoke-WinctlNative $exe @('status', '--json')).Output -join "`n" | ConvertFrom-Json).BackendState } catch { }
         if ($state -eq 'Running') { Write-Done 'Tailscale connected'; return 'ok' }
 
         $hostname = $Ctx.System.machine.tailscale_hostname

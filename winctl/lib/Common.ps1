@@ -76,6 +76,24 @@ function Get-WinctlSecret {
     return $null
 }
 
+# Runs a native command without letting its stderr become a terminating error
+# (Windows PowerShell 5.1 turns redirected stderr into errors under $ErrorActionPreference = 'Stop').
+# Returns @{ ExitCode; Output = stdout lines; Error = stderr text }.
+function Invoke-WinctlNative {
+    param([Parameter(Mandatory)][string]$FilePath, [string[]]$Arguments = @())
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $all = @(& $FilePath @Arguments 2>&1)
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    $stdout = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+    $stderr = (@($all | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join "`n")
+    return [pscustomobject]@{ ExitCode = $code; Output = $stdout; Error = $stderr }
+}
+
 # Strict-mode-safe property read with a default.
 function Get-WinctlProp {
     param($Object, [Parameter(Mandatory)][string]$Name, $Default = $null)

@@ -326,3 +326,14 @@ Describe 'LAN-only wake' {
         @(Select-WinctlWakeDevicesToDisarm -Armed @('NONE') -Keep 'x').Count | Should -Be 0
     }
 }
+
+Describe 'Invoke-WinctlNative' {
+    It 'does not throw on stderr under ErrorActionPreference Stop' {
+        $ErrorActionPreference = 'Stop'
+        $exe = (Get-Process -Id $PID).Path
+        $r = Invoke-WinctlNative $exe @('-NoProfile', '-Command', '[Console]::Error.WriteLine(''boom''); ''out''; exit 3')
+        $r.ExitCode | Should -Be 3
+        $r.Output | Should -Contain 'out'
+        $r.Error | Should -Match 'boom'
+    }
+}

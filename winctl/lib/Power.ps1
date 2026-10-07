@@ -44,7 +44,7 @@ function Get-WinctlInhibitingContainers {
 
 # Devices currently allowed to wake the PC (`powercfg /devicequery wake_armed`).
 function Get-WinctlWakeArmedDevices {
-    $out = @(& powercfg.exe /devicequery wake_armed 2>$null)
+    $out = @((Invoke-WinctlNative powercfg.exe @('/devicequery', 'wake_armed')).Output)
     return @($out | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -ne 'NONE' })
 }
 

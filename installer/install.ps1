@@ -54,7 +54,7 @@ function Unregister-ResumeTask {
 
 function Save-InstallState {
     param([string]$Status, [string]$Step = '')
-    [ordered]@{ status = $Status; step = $Step; time = (Get-WinctlTimestamp); commit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null) } |
+    [ordered]@{ status = $Status; step = $Step; time = (Get-WinctlTimestamp); commit = ((Invoke-WinctlNative git @('-C', $RepoRoot, 'rev-parse', '--short', 'HEAD')).Output -join '') } |
         ConvertTo-Json | Set-Content -LiteralPath (Get-WinctlPath InstallState) -Encoding UTF8
 }
 

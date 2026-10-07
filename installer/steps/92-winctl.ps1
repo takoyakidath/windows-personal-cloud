@@ -30,7 +30,7 @@
         }
 
         $repo = $Ctx.RepoRoot -replace '\\', '/'
-        $safe = @(& git config --system --get-all safe.directory 2>$null)
+        $safe = @((Invoke-WinctlNative git @('config', '--system', '--get-all', 'safe.directory')).Output)
         if ($safe -notcontains $repo) { & git config --system --add safe.directory $repo }
         Write-Done "winctl -> $entry"
         return 'ok'

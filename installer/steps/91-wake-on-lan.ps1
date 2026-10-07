@@ -14,18 +14,24 @@
         if ($wol -and $wol.RegistryValue -ne '1') {
             Set-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword '*WakeOnMagicPacket' -RegistryValue 1
         }
-        & powercfg.exe /deviceenablewake "$($adapter.InterfaceDescription)" 2>$null | Out-Null
+        # powercfg can refuse for some devices (e.g. virtual NICs); report instead of aborting the install.
+        $r = Invoke-WinctlNative powercfg.exe @('/deviceenablewake', $adapter.InterfaceDescription)
+        if ($r.ExitCode -ne 0) { Write-Done "powercfg could not arm $($adapter.InterfaceDescription): $($r.Error)$($r.Output)" }
 
         if ([bool](Get-WinctlProp $Ctx.System.power 'lan_only_wake' $true)) {
             # Disarm every other wake device (mouse, keyboard, Wi-Fi, ...).
             foreach ($device in Select-WinctlWakeDevicesToDisarm -Armed (Get-WinctlWakeArmedDevices) -Keep $adapter.InterfaceDescription) {
-                & powercfg.exe /devicedisablewake "$device" 2>$null | Out-Null
-                Write-Done "Wake disabled: $device"
+                $r = Invoke-WinctlNative powercfg.exe @('/devicedisablewake', $device)
+                if ($r.ExitCode -eq 0) { Write-Done "Wake disabled: $device" }
+                else { Add-ManualAction "Could not disable wake for '$device' (Device Manager > Power Management)." }
             }
             # Wake timers (Windows Update, scheduled tasks) and automatic maintenance must not wake the PC.
-            & powercfg.exe /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 0
-            & powercfg.exe /setdcvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 0
-            & powercfg.exe /setactive SCHEME_CURRENT
+            foreach ($a in @(@('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_SLEEP', 'RTCWAKE', '0'),
+                             @('/setdcvalueindex', 'SCHEME_CURRENT', 'SUB_SLEEP', 'RTCWAKE', '0'),
+                             @('/setactive', 'SCHEME_CURRENT'))) {
+                $r = Invoke-WinctlNative powercfg.exe $a
+                if ($r.ExitCode -ne 0) { Add-ManualAction "powercfg $($a -join ' ') failed: $($r.Error)$($r.Output)" }
+            }
             $maintenance = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Maintenance'
             New-Item -Path $maintenance -Force | Out-Null
             Set-ItemProperty -Path $maintenance -Name WakeUp -Value 0 -Type DWord

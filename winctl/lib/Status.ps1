@@ -67,7 +67,7 @@ function Test-WinctlTailscale {
     $exe = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
     if (-not (Test-Path -LiteralPath $exe)) { return $false }
     try {
-        $json = & $exe status --json 2>$null | Out-String | ConvertFrom-Json
+        $json = (Invoke-WinctlNative $exe @('status', '--json')).Output -join "`n" | ConvertFrom-Json
         return ($json.BackendState -eq 'Running')
     } catch {
         return $false
