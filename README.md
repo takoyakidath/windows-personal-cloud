@@ -80,6 +80,15 @@ Pi は状態の変化も通知する: Hibernate 移行、ヘルスチェック�
 
 任意のコマンドは実行できない。Pi の SSH 鍵は Windows 側で `winctl remote` に強制され、allowlist 外は拒否される。
 
+## 自動更新
+
+GitHub に push すれば、両方のマシンが自動で追従する（fast-forward のみ。ローカル変更があれば何もしない）。
+
+| マシン | タイミング | 動作 |
+| --- | --- | --- |
+| Windows | 毎日 12:00（電源オフで逃したら次の起動時） | `winctl sync --auto`。winctl と config は即反映。`installer/` などが変わったときは自動では再実行せず Discord に通知 → `/win update` |
+| Raspberry Pi | 毎日 04:00 頃 | `controller/update.sh`。`controller/` が変わったら `install.sh` を再実行してサービスを再起動。ログ: `/var/log/windows-controller/update.log` |
+
 ## 設定
 
 | ファイル | 内容 |

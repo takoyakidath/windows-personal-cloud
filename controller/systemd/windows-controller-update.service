@@ -1,0 +1,10 @@
+[Unit]
+Description=Update the Windows Personal Cloud checkout (git pull) and reinstall the controller if it changed
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@CONTROLLER_DIR@/update.sh
+StandardOutput=append:/var/log/windows-controller/update.log
+StandardError=append:/var/log/windows-controller/update.log

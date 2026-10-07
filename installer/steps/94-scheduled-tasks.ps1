@@ -1,6 +1,7 @@
 # Scheduled tasks (all under \winctl\):
 #   WinCtl-Night          daily at power.night_check_time: game check -> winctl sleep
 #   WinCtl-RecoverLogon   at logon: boot recovery
+#   WinCtl-Sync           daily 12:00 (or at next boot if missed): git pull
 #   WinCtl-RecoverResume  on resume from sleep/hibernate (Power-Troubleshooter event 1): recovery
 #   WinCtl-Sleep/Update/Reboot/Shutdown   on demand, started by `winctl remote` so they outlive the SSH session
 #   WinCtl-WslKeepAlive   on demand: keeps the WSL distro (and Docker) running
@@ -46,6 +47,10 @@
         $resume.Delay = 'PT20S'
         $resume.Subscription = '<QueryList><Query Id="0" Path="System"><Select Path="System">*[System[Provider[@Name=''Microsoft-Windows-Power-Troubleshooter''] and EventID=1]]</Select></Query></QueryList>'
         Register-WinctlTask -Name 'WinCtl-RecoverResume' -Action (New-WinctlAction 'recover --reason resume') -Trigger $resume -Settings $default
+
+        # Daily git pull. A missed run happens at next boot (pull only, so that is safe).
+        $sync = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
+        Register-WinctlTask -Name 'WinCtl-Sync' -Action (New-WinctlAction 'sync --auto') -Trigger (New-ScheduledTaskTrigger -Daily -At '12:00') -Settings $sync
 
         foreach ($cmd in 'sleep', 'update', 'reboot', 'shutdown') {
             $name = 'WinCtl-' + (Get-Culture).TextInfo.ToTitleCase($cmd)

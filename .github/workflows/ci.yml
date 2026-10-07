@@ -89,7 +89,7 @@ jobs:
           # Windows stores CIDR as address/mask.
           Assert ($addr -contains '100.64.0.0/255.192.0.0' -and $addr -contains 'LocalSubnet' -and $addr -notcontains 'Any') "SSH firewall scope ($($addr -join ', '))"
 
-          foreach ($t in 'WinCtl-Night', 'WinCtl-RecoverLogon', 'WinCtl-RecoverResume', 'WinCtl-Sleep', 'WinCtl-WslKeepAlive') {
+          foreach ($t in 'WinCtl-Night', 'WinCtl-Sync', 'WinCtl-RecoverLogon', 'WinCtl-RecoverResume', 'WinCtl-Sleep', 'WinCtl-WslKeepAlive') {
             Assert (Get-ScheduledTask -TaskPath '\winctl\' -TaskName $t -ErrorAction SilentlyContinue) "task $t"
           }
           Assert ((Get-ScheduledTask -TaskPath '\winctl\' -TaskName 'WinCtl-Night').Settings.StartWhenAvailable -eq $false) 'night task does not run late'

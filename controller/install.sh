@@ -7,7 +7,6 @@ CONTROLLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_USER=windows-controller
 ETC=/etc/windows-controller
 VENV=/opt/windows-controller/venv
-UNIT=/etc/systemd/system/windows-controller.service
 
 [[ $EUID -eq 0 ]] || { echo "run as root (sudo)"; exit 1; }
 
@@ -42,9 +41,13 @@ if ! runuser -u "$SERVICE_USER" -- test -r "$CONTROLLER_DIR/bot/app.py"; then
   exit 1
 fi
 # The service runs the code straight from this checkout; it must be readable by the service user.
-sed "s|@CONTROLLER_DIR@|$CONTROLLER_DIR|" "$CONTROLLER_DIR/systemd/windows-controller.service" > "$UNIT"
+for unit in windows-controller.service windows-controller-update.service windows-controller-update.timer; do
+  sed "s|@CONTROLLER_DIR@|$CONTROLLER_DIR|" "$CONTROLLER_DIR/systemd/$unit" > "/etc/systemd/system/$unit"
+done
 systemctl daemon-reload
 systemctl enable windows-controller >/dev/null
+# Daily git pull (fast-forward only) + reinstall when controller/ changed: controller/update.sh
+systemctl enable --now windows-controller-update.timer >/dev/null
 
 if [[ "${1:-}" == "--hardware-watchdog" ]]; then
   # Reboot the Pi itself if the kernel hangs.

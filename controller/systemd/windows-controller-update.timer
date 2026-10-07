@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily self-update of the Windows Personal Cloud controller
+
+[Timer]
+OnCalendar=*-*-* 04:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

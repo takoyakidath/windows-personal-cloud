@@ -103,6 +103,15 @@ function Get-WinctlProp {
     return $Default
 }
 
+# Pure: do these changed repo paths need the installer to be re-run?
+function Test-WinctlNeedsReinstall {
+    param([string[]]$ChangedFiles = @())
+    foreach ($f in $ChangedFiles) {
+        if ($f -match '^(installer/|config/ssh/|bootstrap\.ps1$)') { return $true }
+    }
+    return $false
+}
+
 function Get-WinctlTimestamp { return (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
 
 function Initialize-WinctlDirectories {

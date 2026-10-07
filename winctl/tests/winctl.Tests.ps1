@@ -337,3 +337,13 @@ Describe 'Invoke-WinctlNative' {
         $r.Error | Should -Match 'boom'
     }
 }
+
+Describe 'Auto sync' {
+    It 'asks for a reinstall only when installer-side files change' {
+        Test-WinctlNeedsReinstall @('winctl/lib/Power.ps1', 'config/games.json', 'README.md') | Should -BeFalse
+        Test-WinctlNeedsReinstall @('installer/steps/90-firewall.ps1') | Should -BeTrue
+        Test-WinctlNeedsReinstall @('config/ssh/controller.pub') | Should -BeTrue
+        Test-WinctlNeedsReinstall @('bootstrap.ps1') | Should -BeTrue
+        Test-WinctlNeedsReinstall @() | Should -BeFalse
+    }
+}

@@ -70,12 +70,30 @@ function Invoke-Doctor {
     switch ($status.state) { 'ERROR' { exit 2 } 'DEGRADED' { exit 1 } default { exit 0 } }
 }
 
+# git pull --ff-only. winctl and config run from this checkout, so changes apply immediately;
+# installer changes are only reported (re-running it may reboot, so that stays manual: winctl update).
 function Invoke-Sync {
+    param([switch]$Auto)
     $repo = $script:RepoRoot
     if (-not (Test-Path -LiteralPath (Join-Path $repo '.git'))) { throw "$repo is not a git checkout." }
-    & git -C $repo pull --ff-only
-    if ($LASTEXITCODE -ne 0) { throw 'git pull failed (local changes?).' }
-    Add-WinctlHistory -Event 'sync' -Detail (& git -C $repo rev-parse --short HEAD)
+    $before = ((Invoke-WinctlNative git @('-C', $repo, 'rev-parse', 'HEAD')).Output -join '')
+    $pull = Invoke-WinctlNative git @('-C', $repo, 'pull', '--ff-only', '--quiet')
+    if ($pull.ExitCode -ne 0) {
+        $msg = "git pull failed (local changes?): $($pull.Error)"
+        if ($Auto) { Send-WinctlNotification ([char]::ConvertFromUtf32(0x1F7E1) + " Auto-sync failed on $env:COMPUTERNAME. Run winctl sync to see why.") }
+        throw $msg
+    }
+    $after = ((Invoke-WinctlNative git @('-C', $repo, 'rev-parse', 'HEAD')).Output -join '')
+    if ($before -eq $after) { Write-WinctlLog -Event 'sync' -Message 'Already up to date.'; return }
+
+    $changed = @((Invoke-WinctlNative git @('-C', $repo, 'diff', '--name-only', $before, $after)).Output)
+    $short = '{0} -> {1}' -f $before.Substring(0, 7), $after.Substring(0, 7)
+    Add-WinctlHistory -Event 'sync' -Detail $short
+    Write-WinctlLog -Event 'sync' -Message "Updated $short ($($changed.Count) files)"
+    if (Test-WinctlNeedsReinstall $changed) {
+        Write-WinctlLog -Level WARN -Event 'sync' -Message 'Installer changed: run "winctl update" (as Administrator) to apply it.'
+        Send-WinctlNotification ([char]::ConvertFromUtf32(0x1F504) + " $env:COMPUTERNAME pulled $short. Installer changed: run winctl update or /win update.")
+    }
 }
 
 function Invoke-Update {
@@ -155,7 +173,7 @@ try {
             else { Invoke-WinctlBackup }
         }
         'restore'  { Invoke-WinctlRestore -Yes:(Test-Flag '--yes') }
-        'sync'     { Invoke-Sync }
+        'sync'     { Invoke-Sync -Auto:(Test-Flag '--auto') }
         'update'   { Invoke-Update }
         'reboot'   { Invoke-Restart 'reboot' }
         'shutdown' { Invoke-Restart 'shutdown' }
