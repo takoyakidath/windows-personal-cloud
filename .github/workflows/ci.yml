@@ -86,7 +86,8 @@ jobs:
           Assert ((Get-SmbShare -Name Workspace).EncryptData) 'SMB share is encrypted'
 
           $addr = (Get-NetFirewallRule -Name OpenSSH-Server-In-TCP | Get-NetFirewallAddressFilter).RemoteAddress
-          Assert ($addr -contains '100.64.0.0/10' -and $addr -contains 'LocalSubnet') "SSH firewall scope ($($addr -join ', '))"
+          # Windows stores CIDR as address/mask.
+          Assert ($addr -contains '100.64.0.0/255.192.0.0' -and $addr -contains 'LocalSubnet' -and $addr -notcontains 'Any') "SSH firewall scope ($($addr -join ', '))"
 
           foreach ($t in 'WinCtl-Night', 'WinCtl-RecoverLogon', 'WinCtl-RecoverResume', 'WinCtl-Sleep', 'WinCtl-WslKeepAlive') {
             Assert (Get-ScheduledTask -TaskPath '\winctl\' -TaskName $t -ErrorAction SilentlyContinue) "task $t"
