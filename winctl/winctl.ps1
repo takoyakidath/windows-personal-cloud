@@ -36,6 +36,7 @@ winctl - Windows Personal Cloud controller
                             List services or control one
   disk                      Disk usage
   backup [verify]           Back up the workspace (or check it is up to date)
+  backup on|off|status      Enable / disable backup on this PC (no external drive yet? keep it off)
   restore [--yes]           Copy the backup back into the workspace (never deletes)
   sync                      git pull the configuration repository
   update [--packages]       sync + re-run the idempotent installer (+ winget upgrades)
@@ -169,8 +170,19 @@ try {
             foreach ($d in Get-WinctlDisks) { Write-Host ('{0}  {1,6} GB free of {2,6} GB ({3}%)' -f $d.drive, $d.free_gb, $d.total_gb, $d.free_percent) }
         }
         'backup' {
-            if ($Rest.Count -gt 0 -and $Rest[0] -eq 'verify') { if ((Test-WinctlBackup) -gt 0) { exit 1 } }
-            else { Invoke-WinctlBackup }
+            $sub = ''
+            if ($Rest.Count -gt 0) { $sub = $Rest[0].ToLowerInvariant() }
+            switch ($sub) {
+                'on'     { Set-WinctlBackupEnabled $true; Write-Host "Backup ENABLED (target: $((Get-WinctlConfig system).backup.target))" }
+                'off'    { Set-WinctlBackupEnabled $false; Write-Host 'Backup DISABLED' }
+                'status' { Write-Host ('Backup is ' + $(if (Test-WinctlBackupEnabled) { 'ENABLED' } else { 'DISABLED' })) }
+                default {
+                    # Disabled is a setting, not a failure: explain and stop without recording last_error.
+                    if (-not (Test-WinctlBackupEnabled)) { Write-Host 'Backup is disabled. Enable it with "winctl backup on".'; exit 2 }
+                    if ($sub -eq 'verify') { if ((Test-WinctlBackup) -gt 0) { exit 1 } }
+                    else { Invoke-WinctlBackup }
+                }
+            }
         }
         'restore'  { Invoke-WinctlRestore -Yes:(Test-Flag '--yes') }
         'sync'     { Invoke-Sync -Auto:(Test-Flag '--auto') }

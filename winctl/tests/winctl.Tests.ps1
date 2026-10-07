@@ -308,7 +308,7 @@ Describe 'Night backup' {
         Should -Invoke Invoke-WinctlSleep -Times 1
     }
     It 'backs up first when enabled, and still sleeps if the backup fails' {
-        Set-Content -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -Value '{"backup":{"before_night_sleep":true}}'
+        Set-Content -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -Value '{"backup":{"enabled":true,"before_night_sleep":true}}'
         Mock Invoke-WinctlBackup { throw 'drive missing' }
         Invoke-WinctlNight
         Should -Invoke Invoke-WinctlBackup -Times 1
@@ -345,5 +345,34 @@ Describe 'Auto sync' {
         Test-WinctlNeedsReinstall @('config/ssh/controller.pub') | Should -BeTrue
         Test-WinctlNeedsReinstall @('bootstrap.ps1') | Should -BeTrue
         Test-WinctlNeedsReinstall @() | Should -BeFalse
+    }
+}
+
+Describe 'Backup on/off' {
+    AfterEach { Remove-Item -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -ErrorAction SilentlyContinue }
+
+    It 'is off by default and refuses to run' {
+        Test-WinctlBackupEnabled | Should -BeFalse
+        { Invoke-WinctlBackup } | Should -Throw '*disabled*'
+        { Test-WinctlBackup } | Should -Throw '*disabled*'
+    }
+
+    It 'winctl backup on/off writes only backup.enabled to system.local.json' {
+        Set-Content -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -Value '{"machine":{"mac_address":"aa:bb:cc:dd:ee:ff"}}'
+        Set-WinctlBackupEnabled $true
+        Test-WinctlBackupEnabled | Should -BeTrue
+        (Get-WinctlConfig system).machine.mac_address | Should -Be 'aa:bb:cc:dd:ee:ff'
+        (Get-WinctlConfig system).backup.target | Should -Not -BeNullOrEmpty
+        Set-WinctlBackupEnabled $false
+        Test-WinctlBackupEnabled | Should -BeFalse
+    }
+
+    It 'night sleep never backs up while disabled, even with before_night_sleep' {
+        Set-Content -LiteralPath (Join-Path $script:TempConfig 'system.local.json') -Value '{"backup":{"enabled":false,"before_night_sleep":true}}'
+        Mock Get-WinctlRunningGames { @() }
+        Mock Invoke-WinctlSleep { $true }
+        Mock Invoke-WinctlBackup { }
+        Invoke-WinctlNight
+        Should -Invoke Invoke-WinctlBackup -Times 0
     }
 }

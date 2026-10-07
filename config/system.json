@@ -51,6 +51,7 @@
     "inhibit_docker_label": "wpc.inhibit-sleep=true"
   },
   "backup": {
+    "enabled": false,
     "target": "E:\\Backups\\windows-personal-cloud",
     "mirror": false,
     "max_age_days": 7,

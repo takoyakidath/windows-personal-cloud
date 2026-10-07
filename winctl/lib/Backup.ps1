@@ -3,6 +3,30 @@
 
 Set-StrictMode -Version 2.0
 
+# Backup can be switched off (e.g. no external SSD yet): backup.enabled in config, or `winctl backup on|off`.
+function Test-WinctlBackupEnabled {
+    param($SystemConfig = (Get-WinctlConfig system))
+    return [bool](Get-WinctlProp $SystemConfig.backup 'enabled' $false)
+}
+
+function Assert-WinctlBackupEnabled {
+    if (-not (Test-WinctlBackupEnabled)) {
+        throw 'Backup is disabled. Enable it with "winctl backup on" (or backup.enabled in config/system.json).'
+    }
+}
+
+# Writes backup.enabled to the git-ignored config/system.local.json (this machine only).
+function Set-WinctlBackupEnabled {
+    param([Parameter(Mandatory)][bool]$Enabled)
+    $path = Join-Path (Get-WinctlConfigDir) 'system.local.json'
+    $local = [pscustomobject]@{}
+    if (Test-Path -LiteralPath $path) { $local = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json }
+    $override = [pscustomobject]@{ backup = [pscustomobject]@{ enabled = $Enabled } }
+    $merged = Merge-WinctlObject -Base $local -Override $override
+    $merged | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding UTF8
+    Add-WinctlHistory -Event 'backup' -Detail $(if ($Enabled) { 'enabled' } else { 'disabled' })
+}
+
 function Get-WinctlBackupPaths {
     $system = Get-WinctlConfig system
     $source = Get-WinctlWorkspacePath $system
@@ -43,6 +67,7 @@ function Assert-WinctlBackupTarget {
 }
 
 function Invoke-WinctlBackup {
+    Assert-WinctlBackupEnabled
     $system = Get-WinctlConfig system
     $paths = Get-WinctlBackupPaths
     Assert-WinctlBackupTarget $paths
@@ -86,6 +111,7 @@ function Test-WinctlBackupFresh {
 
 # Lists files that differ between workspace and backup without copying anything.
 function Test-WinctlBackup {
+    Assert-WinctlBackupEnabled
     $system = Get-WinctlConfig system
     $paths = Get-WinctlBackupPaths
     Assert-WinctlBackupTarget $paths

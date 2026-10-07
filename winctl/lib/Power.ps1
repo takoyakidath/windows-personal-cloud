@@ -166,7 +166,7 @@ function Invoke-WinctlNight {
     }
     # product.txt §22 "Check backup": optionally back up first (skipped when the drive is not connected).
     $backup = (Get-WinctlConfig system).backup
-    if ((Get-WinctlProp $backup 'before_night_sleep' $false) -and -not (Test-WinctlInhibited -State (Get-WinctlState) -Now ([DateTimeOffset]::Now))) {
+    if ((Get-WinctlProp $backup 'enabled' $false) -and (Get-WinctlProp $backup 'before_night_sleep' $false) -and -not (Test-WinctlInhibited -State (Get-WinctlState) -Now ([DateTimeOffset]::Now))) {
         try { Invoke-WinctlBackup }
         catch { Write-WinctlLog -Level WARN -Event 'night' -Message "Backup before sleep failed: $($_.Exception.Message)" }
     }

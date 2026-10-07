@@ -91,6 +91,9 @@ SSH / RDP / SMB の受信ルールは、ローカライズされない内部名�
 ACL も SID（`*S-1-5-32-544` など）で指定する。
 
 ### Backup
+既定は **無効**（`backup.enabled: false`）。外付け SSD / NAS が用意できたら `winctl backup on`（その PC の `config/system.local.json` に保存）か、
+`config/system.json` で有効にする。無効の間は backup / verify / 夜間 Backup / doctor の Backup 表示がすべて止まる（restore は使える）。
+
 robocopy で Workspace → `backup.target\Workspace`。既定では **宛先の削除もしない**（`mirror: false`）。
 restore は削除せず、Workspace 側の新しいファイルを上書きしない（`/XO`）うえ、`--yes` が必要。
 実行中は lock を作り、Night Mode が Hibernate しないようにする。

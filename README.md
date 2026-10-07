@@ -54,6 +54,7 @@ winctl inhibit on|tonight|off   21:00 の自動 Hibernate を禁止 (tonight = �
 winctl services [start|stop NAME]
 winctl disk
 winctl backup [verify]     Workspace → 外付け SSD / NAS (robocopy、既定では削除しない)
+winctl backup on|off       Backup の有効 / 無効 (既定は無効。この PC の system.local.json に保存)
 winctl restore [--yes]     Backup → Workspace (削除しない・新しいファイルは上書きしない)
 winctl sync                git pull
 winctl update [--packages] git pull + インストーラ再実行 (+ winget upgrade)

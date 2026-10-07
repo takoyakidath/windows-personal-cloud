@@ -143,8 +143,10 @@ function Get-WinctlHealthChecks {
     } catch { }
 
     $state = Get-WinctlState
-    $fresh = Test-WinctlBackupFresh -LastBackup $state.last_backup -MaxAgeDays ([int](Get-WinctlProp $system.backup 'max_age_days' 7)) -Now ([DateTimeOffset]::Now)
-    $checks += New-WinctlCheck -Name 'Backup' -Ok $fresh.ok -Detail $fresh.detail -Severity 'info'
+    if (Test-WinctlBackupEnabled $system) {
+        $fresh = Test-WinctlBackupFresh -LastBackup $state.last_backup -MaxAgeDays ([int](Get-WinctlProp $system.backup 'max_age_days' 7)) -Now ([DateTimeOffset]::Now)
+        $checks += New-WinctlCheck -Name 'Backup' -Ok $fresh.ok -Detail $fresh.detail -Severity 'info'
+    }
 
     return [pscustomobject]@{ checks = $checks; services = [pscustomobject]$serviceStatus }
 }
