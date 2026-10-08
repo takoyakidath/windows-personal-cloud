@@ -57,6 +57,7 @@
     "max_age_days": 7,
     "before_night_sleep": false,
     "exclude_dirs": [
+      "Games",
       "node_modules",
       ".venv",
       "__pycache__",
