@@ -13,6 +13,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Pick up tools installed earlier in this session or by previous steps (Git, winget apps).
+$env:Path = (@([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User'), $env:Path) -join ';')
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $RepoRoot 'winctl\lib\Common.ps1')
 
@@ -54,7 +56,9 @@ function Unregister-ResumeTask {
 
 function Save-InstallState {
     param([string]$Status, [string]$Step = '')
-    [ordered]@{ status = $Status; step = $Step; time = (Get-WinctlTimestamp); commit = ((Invoke-WinctlNative git @('-C', $RepoRoot, 'rev-parse', '--short', 'HEAD')).Output -join '') } |
+    $commit = ''
+    try { $commit = ((Invoke-WinctlNative git @('-C', $RepoRoot, 'rev-parse', '--short', 'HEAD')).Output -join '') } catch { }
+    [ordered]@{ status = $Status; step = $Step; time = (Get-WinctlTimestamp); commit = $commit } |
         ConvertTo-Json | Set-Content -LiteralPath (Get-WinctlPath InstallState) -Encoding UTF8
 }
 

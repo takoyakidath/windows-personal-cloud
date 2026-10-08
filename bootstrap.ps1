@@ -160,6 +160,9 @@ if (-not $git) {
     if (-not $git) { Install-GitDirect; $git = Find-Git }
     if (-not $git) { throw 'Git installation failed.' }
 }
+# A freshly installed Git is not on this session's PATH yet; the installer (child process) needs it.
+$gitDir = Split-Path -Parent $git
+if (($env:Path -split ';') -notcontains $gitDir) { $env:Path = "$gitDir;$env:Path" }
 
 # --- Repository ---
 if (Test-Path (Join-Path $RepoDir '.git')) {
