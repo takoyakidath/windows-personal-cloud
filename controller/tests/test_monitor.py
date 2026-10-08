@@ -144,3 +144,49 @@ async def test_wake_with_mode_when_already_up_just_switches():
     assert await m.wake(mode="work") == "WORK"
     assert sent == []
     assert m.client.commands == ["work"]
+
+
+async def test_wake_reports_wol_send_failure_instead_of_dying():
+    m, _, notes, slept = make([Observation(False)])
+
+    def broken():
+        raise OSError(101, "Network is unreachable")
+
+    m.send_wol = broken
+    result = await m.wake()
+    assert result == "OFFLINE"
+    assert slept == []
+    assert notes[-1].startswith("🔴 Could not send Wake-on-LAN")
+    assert m.store.state.waking is False
+
+
+async def test_wake_survives_resend_failure():
+    m, _, notes, _ = make([Observation(False), Observation(False), ready()])
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) > 1:
+            raise OSError("cable unplugged")
+
+    m.send_wol = flaky
+    assert await m.wake() == "READY"
+    assert notes[-1].startswith("🟢")
+
+
+async def test_requested_reboot_does_not_alert_offline():
+    m, _, notes, _ = make([ready("READY"), Observation(False)])
+    m.store.state = ControllerState()
+    await m.poll()
+    m.expect_offline(600)
+    await m.poll()
+    assert notes == []
+
+
+async def test_offline_alert_returns_after_the_quiet_window():
+    m, _, notes, _ = make([ready("READY"), Observation(False)])
+    m.store.state = ControllerState()
+    await m.poll()
+    m.expect_offline(0)
+    await m.poll()
+    assert notes == ["🔴 Windows PC went offline unexpectedly."]

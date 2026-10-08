@@ -37,7 +37,9 @@ function Resolve-WinctlRemoteCommand {
 function Set-WinctlInhibit {
     param([Parameter(Mandatory)][ValidateSet('on', 'off', 'tonight')][string]$Value)
     $state = Get-WinctlState
-    $state.inhibit_sleep = ($Value -eq 'on')
+    # 'tonight' adds a deadline and leaves a permanent `inhibit on` alone; only 'off' clears both.
+    if ($Value -eq 'on') { $state.inhibit_sleep = $true }
+    if ($Value -eq 'off') { $state.inhibit_sleep = $false }
     $until = $null
     if ($Value -eq 'tonight') { $until = (Get-WinctlTonightUntil -Now ([DateTimeOffset]::Now)).ToString('yyyy-MM-ddTHH:mm:sszzz') }
     $state | Add-Member -NotePropertyName 'inhibit_until' -NotePropertyValue $until -Force

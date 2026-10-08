@@ -1,19 +1,20 @@
 # Scheduled tasks (all under \winctl\):
 #   WinCtl-Night          daily at power.night_check_time: game check -> winctl sleep
-#   WinCtl-RecoverLogon   at logon: boot recovery
+#   WinCtl-RecoverLogon   at boot and at logon: recovery (also when nobody logs in after a reboot)
 #   WinCtl-Sync           daily 12:00 (or at next boot if missed): git pull
 #   WinCtl-RecoverResume  on resume from sleep/hibernate (Power-Troubleshooter event 1): recovery
 #   WinCtl-Sleep/Update/Reboot/Shutdown   on demand, started by `winctl remote` so they outlive the SSH session
 #   WinCtl-WslKeepAlive   on demand: keeps the WSL distro (and Docker) running
-# Tasks run as the interactive user because WSL is per-user, through `conhost.exe --headless`
-# so no console window pops up (e.g. over a game, or a permanent one for the WSL keep-alive).
+# Tasks run as the user (WSL is per-user) with LogonType S4U: "run whether the user is logged on or
+# not", without storing a password. So /win sleep, reboot, update and modes also work at the login
+# screen after a reboot or power cut. `conhost.exe --headless` keeps any console window hidden.
 @{
     Name = 'Scheduled tasks'
     Run  = {
         param($Ctx)
         $path = '\winctl\'
         $winctl = Join-Path (Get-WinctlPath Bin) 'winctl.cmd'
-        $principal = New-ScheduledTaskPrincipal -UserId $Ctx.UserId -LogonType Interactive -RunLevel Highest
+        $principal = New-ScheduledTaskPrincipal -UserId $Ctx.UserId -LogonType S4U -RunLevel Highest
 
         function New-HiddenAction { param([string]$CommandLine)
             New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless $CommandLine"
@@ -37,9 +38,11 @@
         $at = [datetime]::ParseExact($Ctx.System.power.night_check_time, 'HH:mm', $null)
         Register-WinctlTask -Name 'WinCtl-Night' -Action (New-WinctlAction 'night') -Trigger (New-ScheduledTaskTrigger -Daily -At $at) -Settings $night
 
+        $boot = New-ScheduledTaskTrigger -AtStartup
+        $boot.Delay = 'PT60S'
         $logon = New-ScheduledTaskTrigger -AtLogOn -User $Ctx.UserId
         $logon.Delay = 'PT30S'
-        Register-WinctlTask -Name 'WinCtl-RecoverLogon' -Action (New-WinctlAction 'recover --reason boot') -Trigger $logon -Settings $default
+        Register-WinctlTask -Name 'WinCtl-RecoverLogon' -Action (New-WinctlAction 'recover --reason boot') -Trigger @($boot, $logon) -Settings $default
 
         $class = Get-CimClass -ClassName MSFT_TaskEventTrigger -Namespace Root/Microsoft/Windows/TaskScheduler
         $resume = $class | New-CimInstance -ClientOnly

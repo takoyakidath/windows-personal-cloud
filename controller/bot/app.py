@@ -27,6 +27,9 @@ from wake.wol import send_magic_packet
 
 log = logging.getLogger("controller.bot")
 
+# After /win reboot or /win shutdown, going offline within this window is expected, not an alert.
+REQUESTED_DOWNTIME_SECONDS = 600
+
 
 class ControllerBot(discord.Client):
     def __init__(self, config: Config):
@@ -53,7 +56,14 @@ class ControllerBot(discord.Client):
     def spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
         self._background.add(task)
-        task.add_done_callback(self._background.discard)
+        task.add_done_callback(self._task_done)
+
+    def _task_done(self, task: asyncio.Task) -> None:
+        self._background.discard(task)
+        if not task.cancelled() and task.exception():
+            log.error("background task failed", exc_info=task.exception())
+            # Never leave a /win command without an answer.
+            asyncio.create_task(self.notify(f"🔴 Controller error: {task.exception()}"))
 
     async def setup_hook(self) -> None:
         if self.config.discord.guild_id:
@@ -207,6 +217,7 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
         if not confirm:
             await interaction.response.send_message("Add `confirm:True` to reboot.", ephemeral=True)
             return
+        bot.monitor.expect_offline(REQUESTED_DOWNTIME_SECONDS)
         await run_remote(interaction, "reboot", "🔁 Reboot requested.")
 
     @group.command(name="shutdown", description="Shut the PC down (needs manual power on or WoL)")
@@ -215,6 +226,7 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
         if not confirm:
             await interaction.response.send_message("Add `confirm:True` to shut down.", ephemeral=True)
             return
+        bot.monitor.expect_offline(REQUESTED_DOWNTIME_SECONDS)
         await run_remote(interaction, "shutdown", "⏻ Shutdown requested.")
 
     return group

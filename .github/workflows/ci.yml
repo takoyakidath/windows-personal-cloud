@@ -93,6 +93,30 @@ jobs:
             Assert (Get-ScheduledTask -TaskPath '\winctl\' -TaskName $t -ErrorAction SilentlyContinue) "task $t"
           }
           Assert ((Get-ScheduledTask -TaskPath '\winctl\' -TaskName 'WinCtl-Night').Settings.StartWhenAvailable -eq $false) 'night task does not run late'
+          foreach ($t in Get-ScheduledTask -TaskPath '\winctl\') {
+            Assert ($t.Principal.LogonType -eq 'S4U') "$($t.TaskName) runs whether the user is logged on or not ($($t.Principal.LogonType))"
+          }
+          $boot = (Get-ScheduledTask -TaskPath '\winctl\' -TaskName 'WinCtl-RecoverLogon').Triggers | Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskBootTrigger' }
+          Assert $boot 'recovery also runs at boot (nobody logged in)'
+
+          # An S4U task really starts (proves the principal works): WinCtl-Sync runs git pull.
+          Start-ScheduledTask -TaskPath '\winctl\' -TaskName 'WinCtl-Sync'
+          $deadline = (Get-Date).AddMinutes(2)
+          do { Start-Sleep -Seconds 3; $info = Get-ScheduledTaskInfo -TaskPath '\winctl\' -TaskName 'WinCtl-Sync' } while ($info.LastTaskResult -eq 267009 -and (Get-Date) -lt $deadline)
+          Assert ($info.LastRunTime -gt (Get-Date).AddMinutes(-5)) "S4U task ran (result $($info.LastTaskResult))"
+
+          # Only admins/SYSTEM may write what runs elevated; the user may write logs/locks/data only.
+          $users = 'BUILTIN\Users'
+          # (In CI the repo is the workspace checkout; bin\winctl.cmd is the elevated entry point under ProgramData.)
+          foreach ($dir in 'C:\ProgramData\winctl', 'C:\ProgramData\winctl\bin') {
+            $acl = (Get-Acl $dir).Access | Where-Object { $_.IdentityReference -eq $users }
+            Assert (-not ($acl | Where-Object { $_.FileSystemRights -match 'Write|Modify|FullControl|CreateFiles|AppendData' })) "Users cannot write $dir"
+          }
+          $me = "$env:USERDOMAIN\$env:USERNAME"
+          $binMe = (Get-Acl C:\ProgramData\winctl\bin).Access | Where-Object { $_.IdentityReference -eq $me }
+          Assert (-not ($binMe | Where-Object { $_.FileSystemRights -match 'Modify|Write' })) 'the user has no write grant on bin'
+          $dataMe = (Get-Acl C:\ProgramData\winctl\data).Access | Where-Object { $_.IdentityReference -eq $me -and $_.FileSystemRights -match 'Modify' }
+          Assert $dataMe 'the user may write the data directory'
 
           $keys = Get-Content C:\ProgramData\ssh\administrators_authorized_keys
           Assert (@($keys | Where-Object { $_ -like '# BEGIN windows-personal-cloud*' }).Count -eq 1) 'one managed key block after two runs'

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import datetime
@@ -38,6 +39,11 @@ class Monitor:
         self.notify = notify
         self.sleep = sleep
         self._wake_lock = asyncio.Lock()
+        self._quiet_until = 0.0
+
+    def expect_offline(self, seconds: float) -> None:
+        """A reboot/shutdown was requested: going offline in the next `seconds` is not an incident."""
+        self._quiet_until = time.monotonic() + seconds
 
     @property
     def waking(self) -> bool:
@@ -70,7 +76,7 @@ class Monitor:
             await self.notify("💤 Windows PC entered Hibernate.")
         elif display == "ERROR":
             await self.notify("🔴 Windows PC failed health check.")
-        elif display == "OFFLINE" and previous in READY_STATES | {"DEGRADED"}:
+        elif display == "OFFLINE" and previous in READY_STATES | {"DEGRADED"} and time.monotonic() >= self._quiet_until:
             # Gone without `winctl sleep`: crash, power loss, network or manual shutdown.
             await self.notify("🔴 Windows PC went offline unexpectedly.")
         elif display in READY_STATES and previous in ("OFFLINE", "HIBERNATED"):
@@ -100,7 +106,13 @@ class Monitor:
             self.store.save(replace(self.store.load(), waking=True))
             try:
                 log.info("sending magic packet")
-                self.send_wol()
+                try:
+                    self.send_wol()
+                except OSError as e:
+                    # e.g. ENETUNREACH when the direct WoL cable is unplugged and eth0 has no address.
+                    log.error("magic packet failed: %s", e)
+                    await self.notify(f"🔴 Could not send Wake-on-LAN: {e}")
+                    return "OFFLINE"
                 await self.notify("⚡ Wake requested.")
                 for delay in self.wake_config.check_delays_seconds:
                     await self.sleep(delay)
@@ -110,7 +122,10 @@ class Monitor:
                         await self.notify("🟢 Windows PC is ready.")
                         return await self._apply_mode(mode, display)
                     if not obs.reachable and self.wake_config.resend_packet:
-                        self.send_wol()
+                        try:
+                            self.send_wol()
+                        except OSError as e:
+                            log.warning("magic packet resend failed: %s", e)
             finally:
                 self.store.save(replace(self.store.load(), waking=False))
 

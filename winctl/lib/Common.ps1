@@ -12,11 +12,12 @@ function Get-WinctlHome {
 }
 
 function Get-WinctlPath {
-    param([Parameter(Mandatory)][ValidateSet('Logs', 'State', 'History', 'Secrets', 'Locks', 'Bin', 'InstallState')][string]$Name)
+    param([Parameter(Mandatory)][ValidateSet('Logs', 'State', 'Data', 'History', 'Secrets', 'Locks', 'Bin', 'InstallState')][string]$Name)
     $homeDir = Get-WinctlHome
     switch ($Name) {
         'Logs'         { return (Join-Path $homeDir 'logs') }
-        'State'        { return (Join-Path $homeDir 'state.json') }
+        'Data'         { return (Join-Path $homeDir 'data') }
+        'State'        { return (Join-Path (Join-Path $homeDir 'data') 'state.json') }
         'History'      { return (Join-Path (Join-Path $homeDir 'logs') 'history.jsonl') }
         'Secrets'      { return (Join-Path $homeDir 'secrets.json') }
         'Locks'        { return (Join-Path $homeDir 'locks') }
@@ -107,7 +108,8 @@ function Get-WinctlProp {
 function Test-WinctlNeedsReinstall {
     param([string[]]$ChangedFiles = @())
     foreach ($f in $ChangedFiles) {
-        if ($f -match '^(installer/|config/ssh/|bootstrap\.ps1$)') { return $true }
+        # Files the installer applies (packages, firewall, tasks, hostname, keys) - not read at runtime only.
+        if ($f -match '^(installer/|config/ssh/|config/system\.json$|config/services\.json$|bootstrap\.(ps1|cmd)$)') { return $true }
     }
     return $false
 }
@@ -115,7 +117,7 @@ function Test-WinctlNeedsReinstall {
 function Get-WinctlTimestamp { return (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
 
 function Initialize-WinctlDirectories {
-    foreach ($dir in @((Get-WinctlHome), (Get-WinctlPath Logs), (Get-WinctlPath Locks))) {
+    foreach ($dir in @((Get-WinctlHome), (Get-WinctlPath Logs), (Get-WinctlPath Locks), (Get-WinctlPath Data))) {
         if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     }
 }

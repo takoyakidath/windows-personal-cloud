@@ -45,9 +45,16 @@ Night Mode の「WSL2 停止 / Docker 停止」が単純になる。Docker API �
 WSL はアイドル状態の distro を止めるため、`\winctl\WinCtl-WslKeepAlive`（`sleep infinity`）で起動状態を保つ。
 タスクとして動かすのは、SSH セッションから起動しても終了時に巻き込まれないようにするため。
 
-### WSL は per-user なので、タスクはログオンユーザーで動く
-`WinCtl-Night` などは `Interactive` + `Highest` で登録する。ログオフ中は 21:00 チェックが走らないが、
-その状態では WSL / Docker も動いていない。
+### タスクはユーザーとして、ログオンしていなくても動く（S4U）
+WSL は per-user なので SYSTEM ではなくユーザーで動かす。ただし `Interactive` だと再起動・停電後に
+ログイン画面で止まっている間は `/win sleep` や `/win reboot` が黙って何もしないので、`S4U`
+（パスワードを保存しない「ログオンしているかどうかにかかわらず実行」）+ `Highest` で登録する。
+`WinCtl-RecoverLogon` は起動時とログオン時の両方で動き、誰もログインしなくても復旧する。
+
+### 権限
+`C:\ProgramData\winctl`（repo / bin / installer）は昇格して実行されるので、書けるのは SYSTEM と Administrators だけ
+（ProgramData から継承される「Users がファイルを作れる」権限は外す）。非昇格の winctl が書けるのは
+`logs\`、`locks\`、`data\`（state.json）だけ。
 
 ### モードと状態
 - 保存されるのは **mode**（READY / GAME / WORK / SERVER / SLEEP）。

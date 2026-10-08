@@ -10,6 +10,8 @@ BeforeAll {
     New-Item -ItemType Directory -Path $script:TempConfig -Force | Out-Null
     $repoConfig = Join-Path (Join-Path (Join-Path $PSScriptRoot '..') '..') 'config'
     Copy-Item -Path (Join-Path $repoConfig '*.json') -Destination $script:TempConfig
+    # Tests use their own game list so they do not depend on the real config/games.json.
+    Set-Content -LiteralPath (Join-Path $script:TempConfig 'games.json') -Value '{"games":["game.exe","another-game.exe"]}'
     $env:WINCTL_HOME = Join-Path $script:TempHome 'data'
     $env:WINCTL_CONFIG_DIR = $script:TempConfig
 }
@@ -53,6 +55,10 @@ Describe 'Configuration' {
 }
 
 Describe 'State' {
+    It 'lives in the user-writable data directory, not the admin-only root' {
+        (Split-Path -Parent (Get-WinctlPath State)) | Should -Be (Get-WinctlPath Data)
+    }
+
     It 'defaults to READY and round-trips' {
         (Get-WinctlState).mode | Should -Be 'READY'
         Set-WinctlMode 'game'
@@ -271,6 +277,16 @@ Describe 'Inhibit' {
         @(Get-WinctlSleepBlockers -Night).Count | Should -Be 0
     }
 
+    It 'tonight does not cancel a permanent inhibit' {
+        Set-WinctlInhibit -Value 'on'
+        Set-WinctlInhibit -Value 'tonight'
+        (Get-WinctlState).inhibit_sleep | Should -BeTrue
+        (Get-WinctlState).inhibit_until | Should -Not -BeNullOrEmpty
+        Set-WinctlInhibit -Value 'off'
+        (Get-WinctlState).inhibit_sleep | Should -BeFalse
+        (Get-WinctlState).inhibit_until | Should -BeNullOrEmpty
+    }
+
     It 'stayawake and allowsleep are allowlisted for the controller' {
         Resolve-WinctlRemoteCommand 'stayawake' | Should -Be 'stayawake'
         Resolve-WinctlRemoteCommand 'allowsleep' | Should -Be 'allowsleep'
@@ -344,6 +360,9 @@ Describe 'Auto sync' {
         Test-WinctlNeedsReinstall @('installer/steps/90-firewall.ps1') | Should -BeTrue
         Test-WinctlNeedsReinstall @('config/ssh/controller.pub') | Should -BeTrue
         Test-WinctlNeedsReinstall @('bootstrap.ps1') | Should -BeTrue
+        Test-WinctlNeedsReinstall @('config/system.json') | Should -BeTrue
+        Test-WinctlNeedsReinstall @('config/services.json') | Should -BeTrue
+        Test-WinctlNeedsReinstall @('bootstrap.cmd') | Should -BeTrue
         Test-WinctlNeedsReinstall @() | Should -BeFalse
     }
 }

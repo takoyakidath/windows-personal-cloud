@@ -20,8 +20,19 @@
         }
         $env:Path = "$env:Path;$bin"
 
-        # Let the (non-elevated) user write state/logs; keep secrets.json readable only by user + admins.
-        & icacls.exe $Ctx.HomeDir /grant "$($Ctx.UserId):(OI)(CI)M" | Out-Null
+        # Everything here (repo, bin, installer) runs elevated, so only SYSTEM and Administrators may
+        # write it; the inherited ProgramData ACL would let any user create files (e.g. a new installer
+        # step). The non-elevated user may only write logs, locks and data (state.json).
+        & icacls.exe $Ctx.HomeDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
+        & icacls.exe (Join-Path $Ctx.HomeDir '*') /reset /T /C /Q | Out-Null
+        foreach ($dir in @((Get-WinctlPath Logs), (Get-WinctlPath Locks), (Get-WinctlPath Data))) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            & icacls.exe $dir /grant "$($Ctx.UserId):(OI)(CI)M" | Out-Null
+        }
+        $oldState = Join-Path $Ctx.HomeDir 'state.json'
+        if ((Test-Path -LiteralPath $oldState) -and -not (Test-Path -LiteralPath (Get-WinctlPath State))) {
+            Move-Item -LiteralPath $oldState -Destination (Get-WinctlPath State)
+        }
         $secrets = Get-WinctlPath Secrets
         if (Test-Path -LiteralPath $secrets) {
             & icacls.exe $secrets /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F' /grant "$($Ctx.UserId):F" | Out-Null
