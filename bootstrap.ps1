@@ -12,8 +12,17 @@
 # Trojan:Win32/Commando. Safe to run any number of times.
 
 $ErrorActionPreference = 'Stop'
-$RepoUrl = if ($env:WPC_REPO_URL) { $env:WPC_REPO_URL } else { 'https://github.com/takoyakidath/windows-personal-cloud.git' }
-$Branch = if ($env:WPC_BRANCH) { $env:WPC_BRANCH } else { 'main' }
+# Repository to clone: config/system.json next to this script (so a fork only edits config), else env.
+$RepoUrl = $env:WPC_REPO_URL
+$Branch = $env:WPC_BRANCH
+$configPath = Join-Path (Join-Path $PSScriptRoot 'config') 'system.json'
+if (Test-Path -LiteralPath $configPath) {
+    $repoConfig = (Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json).repository
+    if (-not $RepoUrl) { $RepoUrl = $repoConfig.url }
+    if (-not $Branch) { $Branch = $repoConfig.branch }
+}
+if (-not $RepoUrl) { throw "Repository URL unknown: run bootstrap.ps1 from the extracted repository (needs config\system.json)." }
+if (-not $Branch) { $Branch = 'main' }
 $HomeDir = Join-Path $env:ProgramData 'winctl'
 $RepoDir = Join-Path $HomeDir 'repo'
 

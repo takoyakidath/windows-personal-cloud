@@ -1,5 +1,9 @@
 # Windows Personal Cloud
 
+> **個人用の環境定義です**（takoyaki の Alienware m17 R3 + Raspberry Pi 用）。
+> 自分の環境で使う場合は fork して、`config/system.json`（PC 名・MAC・WSL ユーザー・リポジトリ URL など）、
+> `config/games.json`、`config/ssh/` を書き換える。コード側に個人の値は入れていない。
+
 Alienware m17 R3 (Windows) を Workstation / Gaming PC / 開発サーバー / Personal Cloud として使うための
 **Environment as Code** リポジトリ。Windows を入れ直しても、このリポジトリから環境を再構築できる。
 
