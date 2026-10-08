@@ -38,12 +38,7 @@ New-Partition -DiskNumber 0 -UseMaximumSize -DriveLetter D | Format-Volume -File
 ## 2. セットアップ（winget も Git も事前に不要）
 
 - [ ] ブラウザで https://github.com/takoyakidath/windows-personal-cloud → **Code → Download ZIP** → 展開
-- [ ] スタート右クリック →「Windows PowerShell (管理者)」で:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-& "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
-```
+- [ ] 展開したフォルダの **`bootstrap.cmd` をダブルクリック** →「実行」→ 管理者の確認で「はい」
 
 - PC 名が `alienware` に変わり再起動する → **ログインすると自動で続きから再開**
 - `irm ... | iex` 形式は使わない（Defender が Trojan:Win32/Commando として止める）

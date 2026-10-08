@@ -2,7 +2,7 @@
 #
 # On a fresh Windows install (nothing else needed first):
 #   1. Download the repository ZIP in a browser (GitHub > Code > Download ZIP) and extract it.
-#   2. Terminal / PowerShell (Admin):
+#   2. Double-click bootstrap.cmd (it elevates and runs this script), or from PowerShell (Admin):
 #        Set-ExecutionPolicy -Scope Process Bypass
 #        & "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
 #

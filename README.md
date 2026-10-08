@@ -23,12 +23,10 @@ Discord                  = Remote Control Interface (/win status, /win wake, ...
 クリーンな Windows で（winget も Git も事前に不要）:
 
 1. ブラウザで https://github.com/takoyakidath/windows-personal-cloud → **Code → Download ZIP** → 展開
-2. スタートを右クリック →「Windows PowerShell (管理者)」で:
+2. 展開したフォルダの **`bootstrap.cmd` をダブルクリック** →「実行」→ 管理者の確認で「はい」
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-& "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
-```
+（PowerShell から直接なら: 管理者で `Set-ExecutionPolicy -Scope Process Bypass` → `& <展開先>\bootstrap.ps1`。
+2 回目以降は `C:\ProgramData\winctl\repo\bootstrap.cmd` をダブルクリックすれば最新化して再実行する。）
 
 `bootstrap.ps1` が winget を修復（ソースのリセット）→ Git をインストール（winget が駄目なら署名を検証した Git for Windows の公式インストーラ）
 → `C:\ProgramData\winctl\repo` に clone → そこから `installer\install.ps1` を実行する。展開した ZIP はその後消してよい。
