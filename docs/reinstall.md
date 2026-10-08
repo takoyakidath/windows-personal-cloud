@@ -2,14 +2,29 @@
 
 上から順にやれば終わるチェックリスト。Raspberry Pi 側はそのまま動き続ける（触るのは最後の 2 か所だけ）。
 
+## ディスク構成
+
+SSD 1 台（Micron 2300 1TB）を 2 つに分けている。C: = Windows / アプリ / WSL（約 300GB）、
+D: = `Workspace`（残り）。OS の入れ直しでは C: だけを消すので、Workspace は残る。
+
+初回の分割（管理者 PowerShell。C: に余裕があるうちに）:
+
+```powershell
+Get-PartitionSupportedSize -DriveLetter C     # SizeMin が 300GB 未満なら OK
+Resize-Partition -DriveLetter C -Size 300GB
+New-Partition -DiskNumber 0 -UseMaximumSize -DriveLetter D | Format-Volume -FileSystem NTFS -NewFileSystemLabel Workspace
+```
+
 ## 0. 消す前に
 
 - [ ] **バックアップが終わっている**（C: は全部消える。WSL の中身・デスクトップ・ブラウザのデータも）
 - [ ] 必要なら `C:\ProgramData\winctl\secrets.json`（Discord webhook）を控える
-- [ ] D: など別ドライブの `Workspace` は消さない（インストーラは中身を消さない）
+- [ ] D:（`Workspace`）にない大事なデータは D: に移しておく（C: は全部消える）
 
 ## 1. Windows のインストール
 
+- [ ] インストール先の選択では **Windows のパーティション（C:）だけ**を削除・選択する。
+  **`Workspace` ラベルの D: パーティションは消さない**（消さなければ中身はそのまま残る）
 - [ ] **ネットワーク（LAN ケーブルも Wi-Fi も）につながずに**セットアップする
   → 「オフライン アカウント」/「制限付きエクスペリエンス」を選び、ユーザー名 **`takoyaki`** で作る
   （Microsoft アカウントで作るとユーザー名がメールの先頭 5 文字 `takoy` になる）
