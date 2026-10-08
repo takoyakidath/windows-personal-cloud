@@ -70,7 +70,8 @@
     "Microsoft.PowerShell",
     "Tailscale.Tailscale",
     "Parsec.Parsec",
-    "Microsoft.WindowsTerminal"
+    "Microsoft.WindowsTerminal",
+    "Overwolf.CurseForge"
   ],
   "repository": {
     "url": "https://github.com/takoyakidath/windows-personal-cloud.git",
