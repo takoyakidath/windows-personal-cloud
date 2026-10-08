@@ -6,7 +6,7 @@
 #        Set-ExecutionPolicy -Scope Process Bypass
 #        & "$HOME\Downloads\windows-personal-cloud-main\bootstrap.ps1"
 #
-# It repairs winget, installs Git (winget, or the signed Git for Windows installer as a fallback),
+# It installs or repairs winget (official release, SHA-256 verified), installs Git (winget, or the signed Git for Windows installer as a fallback),
 # clones the repo to C:\ProgramData\winctl\repo and runs installer\install.ps1 from there.
 # Do not use the `irm <url> | iex` download cradle: Microsoft Defender rightly flags it as
 # Trojan:Win32/Commando. Safe to run any number of times.
@@ -36,6 +36,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# The PS 5.1 progress bar makes Invoke-WebRequest many times slower on large downloads.
+$ProgressPreference = 'SilentlyContinue'
 New-Item -ItemType Directory -Path $HomeDir -Force | Out-Null
 
 # Native command without stderr turning into a terminating error (Windows PowerShell 5.1 + 'Stop').
@@ -51,6 +53,45 @@ function Test-Winget {
     return ((Invoke-Quiet winget.exe @('search', '--id', 'Git.Git', '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity')) -eq 0)
 }
 
+# Downloads a release asset and checks it against the SHA-256 the release publishes in <name>.txt.
+function Get-VerifiedAsset {
+    param($Release, [string]$Name, [string]$HashName, [string]$Dir)
+    $asset = $Release.assets | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+    $hashAsset = $Release.assets | Where-Object { $_.name -eq $HashName } | Select-Object -First 1
+    if (-not $asset -or -not $hashAsset) { throw "Release asset $Name (or its hash) not found." }
+    $file = Join-Path $Dir $Name
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $file -UseBasicParsing
+    # Save the hash to a file: on PS 5.1 .Content of an octet-stream response is a byte array.
+    $hashFile = Join-Path $Dir $HashName
+    Invoke-WebRequest -Uri $hashAsset.browser_download_url -OutFile $hashFile -UseBasicParsing
+    $expected = (Get-Content -LiteralPath $hashFile -Raw).Trim().Split()[0]
+    $actual = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    if ($actual -ne $expected) { throw "SHA-256 mismatch for $Name (expected $expected, got $actual)." }
+    return $file
+}
+
+# Installs winget (App Installer) from microsoft/winget-cli releases: the documented offline method.
+# Appx packages are signature-checked by Windows on install.
+function Install-WingetDirect {
+    Write-Step 'Installing winget (App Installer) from the official release'
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+    $dir = Join-Path $env:TEMP 'wpc-winget'
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/winget-cli/releases/latest' -UseBasicParsing
+    Write-Host "    winget $($release.tag_name)"
+    $deps = Get-VerifiedAsset $release 'DesktopAppInstaller_Dependencies.zip' 'DesktopAppInstaller_Dependencies.txt' $dir
+    $bundle = Get-VerifiedAsset $release 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle' 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.txt' $dir
+    $depsDir = Join-Path $dir 'deps'
+    Expand-Archive -LiteralPath $deps -DestinationPath $depsDir -Force
+    foreach ($appx in Get-ChildItem -LiteralPath (Join-Path $depsDir $arch) -Filter '*.appx') {
+        # Fails harmlessly when the same or a newer version is already installed.
+        try { Add-AppxPackage -Path $appx.FullName -ErrorAction Stop; Write-Host "    + $($appx.Name)" }
+        catch { Write-Host "    = $($appx.Name) (already present)" }
+    }
+    Add-AppxPackage -Path $bundle -ErrorAction Stop
+    $env:Path = "$env:Path;$env:LOCALAPPDATA\Microsoft\WindowsApps"
+}
+
 # --- winget: register / reset sources (fresh Windows 10 often has a broken or missing source) ---
 function Repair-Winget {
     if (Test-Winget) { return $true }
@@ -62,7 +103,12 @@ function Repair-Winget {
     if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
         Invoke-Quiet winget.exe @('source', 'reset', '--force') | Out-Null
         Invoke-Quiet winget.exe @('source', 'update') | Out-Null
+        if (Test-Winget) { return $true }
     }
+    # Missing or too old (fresh Windows 10): install the current release, then initialise its sources.
+    try { Install-WingetDirect } catch { Write-Warning "winget install failed: $($_.Exception.Message)"; return $false }
+    Invoke-Quiet winget.exe @('source', 'reset', '--force') | Out-Null
+    Invoke-Quiet winget.exe @('source', 'update') | Out-Null
     return (Test-Winget)
 }
 
