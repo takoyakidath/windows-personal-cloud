@@ -111,7 +111,7 @@ restore は削除せず、Workspace 側の新しいファイルを上書きし�
 実行中は lock を作り、Night Mode が Hibernate しないようにする。
 
 ### WoL 専用の直結ケーブル
-Pi の eth0 と Alienware の WoL 用アダプタ（内蔵 Ethernet。`machine.ethernet_adapter`）を 1 本で直結し、WoL 専用にしている（普段の通信は両方とも Wi-Fi）。
+Pi の eth0 と Alienware の WoL 用アダプタ（`machine.ethernet_adapter`。現在は Type-C の USB LAN `Ethernet 2`）を 1 本で直結し、WoL 専用にしている（普段の通信は両方とも Wi-Fi）。
 ルーターがないので Windows 側のこのアダプタは「識別されていないネットワーク」になるが、magic packet は L2 ブロードキャストなので IP は不要（インストーラはゲートウェイなし・メトリック 9999 にして通常通信から外し、`machine.wol_link_address` があれば固定 IP を付ける）。
 Pi の eth0 には `install.sh --wol-link 10.99.0.1/24` で固定 IP を付け、`windows.broadcast` を `10.99.0.255` にすることで、
 magic packet が Wi-Fi ではなく必ず eth0 から出るようにしている。`windows.host` は PC の Wi-Fi 側 IP（DHCP 予約推奨）。
