@@ -65,7 +65,7 @@ sudo systemctl restart windows-controller
 ```
 
   - `host` = Windows の Wi-Fi の IP（`ipconfig` で確認。ルーターで DHCP 予約しておくと変わらない）
-  - `mac_address` = `cc:48:3a:5c:90:cd`（内蔵 Ethernet。再インストールでは変わらない）
+  - `mac_address` = `cc:48:3a:5c:90:cd`（WoL 用アダプタ `machine.ethernet_adapter` の MAC。アダプタを変えたら更新する。現状の値は内蔵 Ethernet のもの）
   - `broadcast` = `10.99.0.255`（Pi と PC の直結ケーブル）
 
 ## 4. 確認

@@ -6,7 +6,29 @@
         param($Ctx)
         . (Join-Path $Ctx.RepoRoot 'winctl\lib\Power.ps1')
         $adapter = Get-WinctlWakeAdapter $Ctx.System
-        if (-not $adapter) { Add-ManualAction 'No built-in Ethernet adapter found; Wake-on-LAN not configured.'; return 'ok' }
+        if (-not $adapter) { Add-ManualAction 'No wired Ethernet adapter found; Wake-on-LAN not configured.'; return 'ok' }
+
+        # The WoL adapter is a link to the Pi only: no gateway, last in routing order, so internet traffic never uses it.
+        # Only when it is the adapter named in config - the fallback pick may be the primary NIC, which must keep its route.
+        $alias = $adapter.Name
+        if ($alias -eq $Ctx.System.machine.ethernet_adapter) {
+            $linkAddress = Get-WinctlProp $Ctx.System.machine 'wol_link_address' ''
+            if ($linkAddress) {
+                # Static config: with DHCP off no lease can bring a gateway back.
+                Set-NetIPInterface -InterfaceAlias $alias -AddressFamily IPv4 -Dhcp Disabled
+                $have = Get-NetIPAddress -InterfaceAlias $alias -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -eq $linkAddress }
+                if (-not $have) {
+                    Get-NetIPAddress -InterfaceAlias $alias -AddressFamily IPv4 -ErrorAction SilentlyContinue | Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue
+                    New-NetIPAddress -InterfaceAlias $alias -IPAddress $linkAddress -PrefixLength 24 | Out-Null
+                }
+                Write-Done "WoL link $alias = $linkAddress/24 (no gateway)"
+            }
+            Get-NetRoute -InterfaceAlias $alias -DestinationPrefix 0.0.0.0/0 -ErrorAction SilentlyContinue | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue
+            Set-NetIPInterface -InterfaceAlias $alias -AddressFamily IPv4 -AutomaticMetric Disabled -InterfaceMetric 9999 -ErrorAction SilentlyContinue
+            Set-DnsClient -InterfaceAlias $alias -RegisterThisConnectionsAddress $false -ErrorAction SilentlyContinue
+        } else {
+            Add-ManualAction "WoL adapter '$($Ctx.System.machine.ethernet_adapter)' not found; used '$alias' for wake only (routes untouched). Fix machine.ethernet_adapter."
+        }
 
         # Magic packet only: pattern wake would let ordinary traffic (ARP, pings, scans) wake the PC.
         Set-NetAdapterPowerManagement -Name $adapter.Name -WakeOnMagicPacket Enabled -WakeOnPattern Disabled -ErrorAction SilentlyContinue

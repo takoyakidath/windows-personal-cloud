@@ -4,7 +4,8 @@
     "hostname": "alienware",
     "tailscale_hostname": "alienware",
     "mac_address": "cc:48:3a:5c:90:cd",
-    "ethernet_adapter": "Ethernet"
+    "ethernet_adapter": "Ethernet 2",
+    "wol_link_address": "10.99.0.2"
   },
   "workspace": {
     "path": "D:\\Workspace",
