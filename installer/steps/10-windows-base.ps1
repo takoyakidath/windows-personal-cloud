@@ -19,8 +19,8 @@
         }
         Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name HideFileExt -Value 0 -Type DWord
 
-        # Mouse pointer trails (length 2-20; 0 = off). Saved in the registry and applied to the running session.
-        $trails = '7'
+        # Mouse pointer trails (length 2-20, shortest = 2; 0 and 1 mean off). Saved in the registry and applied to the running session.
+        $trails = '2'
         Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name MouseTrails -Value $trails -Type String
         try {
             if (-not ('WinctlNative.Mouse' -as [type])) {
