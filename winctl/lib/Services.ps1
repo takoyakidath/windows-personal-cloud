@@ -10,6 +10,8 @@ Set-StrictMode -Version 2.0
 function Invoke-WinctlWsl {
     param([Parameter(Mandatory)][string[]]$Arguments)
     $env:WSL_UTF8 = '1'
+    # wsl.exe writes to stderr for ordinary messages; with ErrorActionPreference=Stop that would throw before ExitCode is read.
+    $ErrorActionPreference = 'Continue'
     $output = & wsl.exe @Arguments 2>&1 | Out-String
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE

@@ -1,3 +1,5 @@
 # Windows batch files must keep CRLF line endings (also in the GitHub ZIP download).
 *.cmd text eol=crlf
 *.bat text eol=crlf
+# Scripts that run inside WSL/Linux must keep LF (a Windows checkout with autocrlf would break `set -o pipefail`).
+*.sh text eol=lf
