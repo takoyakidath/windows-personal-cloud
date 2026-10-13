@@ -8,10 +8,10 @@
     "docker":    { "type": "wsl_systemd", "unit": "docker" }
   },
   "modes": {
-    "READY":  { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
-    "WORK":   { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
-    "SERVER": { "start": ["tailscale", "ssh", "smb", "wsl", "docker"], "stop": [], "compose": [] },
-    "GAME":   { "start": ["tailscale", "parsec"], "stop": ["docker", "wsl"] }
+    "READY":  { "start": ["parsec", "tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
+    "WORK":   { "start": ["parsec", "tailscale", "ssh", "smb", "wsl", "docker"], "stop": [] },
+    "SERVER": { "start": ["parsec", "tailscale", "ssh", "smb", "wsl", "docker"], "stop": [], "compose": [] },
+    "GAME":   { "start": ["parsec", "tailscale"], "stop": ["docker", "wsl"] }
   },
   "sleep_stop": ["docker", "wsl", "parsec"]
 }
