@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 from core.config import WindowsConfig
 from health.status import Observation
@@ -19,6 +20,9 @@ ALLOWED_COMMANDS = frozenset({
     "stayawake", "allowsleep", "sleep", "update", "reboot", "shutdown",
 })
 
+# `launch <game>`: the game key is validated on the Windows side against config/games.json.
+LAUNCH_RE = re.compile(r"^launch [a-z0-9]+$")
+
 _SLOW = {"ready": 240, "game": 240, "work": 240, "server": 240}
 
 
@@ -28,7 +32,7 @@ class WindowsClient:
         self.known_hosts = known_hosts
 
     def ssh_argv(self, command: str) -> list[str]:
-        if command not in ALLOWED_COMMANDS:
+        if command not in ALLOWED_COMMANDS and not LAUNCH_RE.match(command):
             raise ValueError(f"command not allowed: {command!r}")
         c = self.cfg
         return [
@@ -58,7 +62,7 @@ class WindowsClient:
         return proc.returncode, out, err
 
     async def run(self, command: str) -> dict:
-        code, out, err = await self._exec(self.ssh_argv(command), _SLOW.get(command, 60))
+        code, out, err = await self._exec(self.ssh_argv(command), _SLOW.get(command, 240 if command.startswith("launch ") else 60))
         text = out.decode("utf-8", "replace").lstrip("﻿")
         # winctl prints one JSON line; ignore anything a shell profile might add around it.
         json_lines = [ln for ln in text.splitlines() if ln.strip().startswith("{")]

@@ -109,7 +109,7 @@ function Test-WinctlNeedsReinstall {
     param([string[]]$ChangedFiles = @())
     foreach ($f in $ChangedFiles) {
         # Files the installer applies (packages, firewall, tasks, hostname, keys) - not read at runtime only.
-        if ($f -match '^(installer/|config/ssh/|config/system\.json$|config/services\.json$|bootstrap\.(ps1|cmd)$)') { return $true }
+        if ($f -match '^(installer/|config/ssh/|config/system\.json$|config/services\.json$|config/games\.json$|bootstrap\.(ps1|cmd)$)') { return $true }
     }
     return $false
 }

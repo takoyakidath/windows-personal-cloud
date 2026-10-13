@@ -21,6 +21,14 @@ def test_rejects_commands_outside_allowlist():
     assert "exec" not in ALLOWED_COMMANDS
 
 
+def test_launch_argv_only_for_plain_game_keys():
+    client = WindowsClient(CFG, known_hosts="/kh")
+    assert client.ssh_argv("launch ark")[-1] == "launch ark"
+    for bad in ("launch", "launch ark; calc", "launch ../x", "launch ARK", "launch ark ark"):
+        with pytest.raises(ValueError):
+            client.ssh_argv(bad)
+
+
 def test_allowlist_matches_winctl_remote():
     import pathlib, re
     remote = (pathlib.Path(__file__).parents[2] / "winctl" / "lib" / "Remote.ps1").read_text()

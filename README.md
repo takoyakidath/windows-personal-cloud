@@ -84,6 +84,7 @@ winctl logs | history
 | `/win wake [mode:GAME]` | Wake-on-LAN → 30s / 60s / 120s … で確認 → READY で通知（mode 指定時はそのモードへ切替） |
 | `/win sleep` | `winctl sleep`（安全チェックあり） |
 | `/win ready` `/win game` `/win work` `/win server` | モード切替 |
+| `/win launch game:ARK…` | GAME モードに切り替えてゲームを起動（`config/games.json` の `launch` に登録したものだけ。Windows にログイン中であることが必要。接続は Parsec） |
 | `/win stay-awake` / `/win allow-sleep` | 今夜の自動 Hibernate を中止（翌朝 6:00 まで）/ 再開 |
 | `/win doctor` | ヘルスチェック |
 | `/win update` | `winctl update` |
@@ -108,7 +109,7 @@ GitHub に push すれば、両方のマシンが自動で追従する（fast-fo
 | --- | --- |
 | `config/system.json` | ホスト名、Workspace、WSL、電源 (night mode)、Backup 先、winget パッケージ |
 | `config/services.json` | サービス定義とモードごとの start / stop |
-| `config/games.json` | ゲームのプロセス名（ここにあるものだけをゲームとして扱う） |
+| `config/games.json` | `games`: ゲームのプロセス名（ここにあるものだけをゲームとして扱う）、`launch`: `/win launch` で起動できるゲーム（キー → 名前と `steam://rungameid/ID` など）。変更後は `winctl update` |
 | `config/ssh/` | SSH **公開**鍵（自分用 / Pi 用） |
 | `config/*.local.json` | Git 管理外の上書き（任意） |
 

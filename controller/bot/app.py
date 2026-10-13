@@ -187,6 +187,15 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
     async def game(interaction: discord.Interaction):
         await run_remote(interaction, "game")
 
+    @group.command(name="launch", description="Switch to GAME mode and start a game (needs someone logged on to Windows)")
+    @app_commands.describe(game="Game to start")
+    @app_commands.choices(game=[
+        app_commands.Choice(name="ARK: Survival Ascended", value="ark"),
+        app_commands.Choice(name="ARK: Survival Evolved", value="arkse"),
+    ])
+    async def launch(interaction: discord.Interaction, game: app_commands.Choice[str]):
+        await run_remote(interaction, f"launch {game.value}", f"🎮 Launching {game.name} (GAME mode). Connect with Parsec.")
+
     @group.command(name="work", description="Switch to WORK mode")
     async def work(interaction: discord.Interaction):
         await run_remote(interaction, "work")

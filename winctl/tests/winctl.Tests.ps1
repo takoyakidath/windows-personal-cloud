@@ -112,6 +112,12 @@ Describe 'Remote allowlist' {
     ) {
         Resolve-WinctlRemoteCommand $c | Should -BeNullOrEmpty
     }
+    It 'accepts only `launch <key>` with a plain key' -TestCases @(
+        @{ c = 'launch ark'; r = 'launch ark' }, @{ c = ' LAUNCH ArkSE ' ; r = 'launch arkse' },
+        @{ c = 'launch'; r = $null }, @{ c = 'launch ark; calc'; r = $null }, @{ c = 'launch ..\\x'; r = $null }, @{ c = 'launch ark ark'; r = $null }
+    ) {
+        Resolve-WinctlRemoteCommand $c | Should -Be $r
+    }
     It 'maps task commands to scheduled task names' {
         Get-WinctlRemoteTaskName 'sleep' | Should -Be 'WinCtl-Sleep'
     }

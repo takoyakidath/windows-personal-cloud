@@ -28,9 +28,16 @@ function Resolve-WinctlRemoteCommand {
     param([string]$Original)
     if (-not $Original) { return $null }
     $trimmed = $Original.Trim().ToLowerInvariant()
+    # `launch <key>`: key is checked against config/games.json when it runs; nothing else is accepted.
+    if ($trimmed -match '^launch ([a-z0-9]+)$') { return $trimmed }
     if ($trimmed -notmatch '^[a-z]+$') { return $null }
     if ($script:RemoteAllowlist.Contains($trimmed)) { return $trimmed }
     return $null
+}
+
+function Get-WinctlLaunchGame {
+    param([Parameter(Mandatory)][string]$Key)
+    return Get-WinctlProp (Get-WinctlProp (Get-WinctlConfig games) 'launch' $null) $Key $null
 }
 
 # on = until `inhibit off`; tonight = until the next 06:00; off = clear both.
@@ -69,6 +76,25 @@ function Invoke-WinctlRemote {
     Add-WinctlHistory -Event 'remote' -Detail $command
 
     try {
+        if ($command -like 'launch *') {
+            $key = $command.Substring(7)
+            $game = Get-WinctlLaunchGame $key
+            if (-not $game) { throw "Unknown game '$key' (see config/games.json)." }
+            $task = Get-ScheduledTask -TaskName "WinCtl-Launch-$key" -TaskPath '\winctl\' -ErrorAction SilentlyContinue
+            if (-not $task) { throw "Launch task for '$key' is not installed yet (run: winctl update)." }
+            # Games need the desktop: that task runs in the logged-on user's session, so it cannot work at the login screen.
+            $session = Invoke-WinctlNative query.exe @('user')
+            if ($session.ExitCode -ne 0 -or -not $session.Output) { throw 'Nobody is logged on to Windows, so a game cannot start. Log in first (e.g. via Parsec/RDP).' }
+            Set-WinctlMode 'GAME'
+            $failed = @(Invoke-WinctlModeProfile 'GAME')
+            Start-ScheduledTask -TaskName "WinCtl-Launch-$key" -TaskPath '\winctl\'
+            Add-WinctlHistory -Event 'launch' -Detail $key
+            $status = Get-WinctlStatus
+            $status | Add-Member -NotePropertyName 'failed' -NotePropertyValue $failed -Force
+            $status | Add-Member -NotePropertyName 'launched' -NotePropertyValue $game.name -Force
+            Write-WinctlJson $status
+            return
+        }
         if ($script:RemoteAllowlist[$command] -eq 'task') {
             $task = Get-WinctlRemoteTaskName $command
             Start-ScheduledTask -TaskName $task -TaskPath '\winctl\'

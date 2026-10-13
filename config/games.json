@@ -1,5 +1,16 @@
 {
   "games": [
-    "ArkAscended.exe"
-  ]
+    "ArkAscended.exe",
+    "ShooterGame.exe"
+  ],
+  "launch": {
+    "ark": {
+      "name": "ARK: Survival Ascended",
+      "uri": "steam://rungameid/2399830"
+    },
+    "arkse": {
+      "name": "ARK: Survival Evolved",
+      "uri": "steam://rungameid/346110"
+    }
+  }
 }

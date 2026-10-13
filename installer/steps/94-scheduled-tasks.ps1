@@ -5,6 +5,7 @@
 #   WinCtl-RecoverResume  on resume from sleep/hibernate (Power-Troubleshooter event 1): recovery
 #   WinCtl-Sleep/Update/Reboot/Shutdown   on demand, started by `winctl remote` so they outlive the SSH session
 #   WinCtl-WslKeepAlive   on demand: keeps the WSL distro (and Docker) running
+#   WinCtl-Launch-<game>  on demand: starts a game from config/games.json in the logged-on user's session
 # Tasks run as the user (WSL is per-user) with LogonType S4U: "run whether the user is logged on or
 # not", without storing a password. So /win sleep, reboot, update and modes also work at the login
 # screen after a reboot or power cut. `conhost.exe --headless` keeps any console window hidden.
@@ -58,6 +59,24 @@
         foreach ($cmd in 'sleep', 'update', 'reboot', 'shutdown') {
             $name = 'WinCtl-' + (Get-Culture).TextInfo.ToTitleCase($cmd)
             Register-WinctlTask -Name $name -Action (New-WinctlAction $cmd) -Trigger $null -Settings $default
+        }
+
+        # One task per game in config/games.json "launch": runs in the logged-on user's desktop session
+        # (Interactive, not S4U) because games need a desktop. `/win launch` starts these.
+        $games = Get-WinctlConfig games
+        $launch = Get-WinctlProp $games 'launch' $null
+        if ($launch) {
+            $interactive = New-ScheduledTaskPrincipal -UserId $Ctx.UserId -LogonType Interactive -RunLevel Limited
+            foreach ($g in $launch.PSObject.Properties) {
+                if ($g.Name -notmatch '^[a-z0-9]+$' -or $g.Value.uri -notmatch '^[a-z.]+://[A-Za-z0-9/_.%?=&-]+$') {
+                    Add-ManualAction "Skipped game '$($g.Name)' in config/games.json (key must be [a-z0-9]+, uri a plain URL like steam://rungameid/123)."
+                    continue
+                }
+                $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c start `"`" `"$($g.Value.uri)`""
+                $p = @{ TaskName = "WinCtl-Launch-$($g.Name)"; TaskPath = $path; Action = $action; Principal = $interactive; Settings = $default; Force = $true }
+                Register-ScheduledTask @p | Out-Null
+                Write-Done "$path$($p.TaskName) -> $($g.Value.uri)"
+            }
         }
 
         $keepAlive = New-HiddenAction "wsl.exe -d $($Ctx.System.wsl.distro) -u root -- sleep infinity"
