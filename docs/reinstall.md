@@ -53,7 +53,7 @@ New-Partition -DiskNumber 0 -UseMaximumSize -DriveLetter D | Format-Volume -File
 - [ ] Windows の SSH ホスト鍵が変わったので、古い鍵を消す:
 
 ```bash
-sudo -u windows-controller ssh-keygen -R 192.168.11.30 -f /var/lib/windows-controller/known_hosts
+sudo -u windows-controller ssh-keygen -R 192.168.11.19 -f /var/lib/windows-controller/known_hosts
 ```
 
 - [ ] ユーザー名や IP が変わったら `controller.json` を直す（再インストール後のユーザー名は `takoyaki` の想定）:
@@ -65,13 +65,13 @@ sudo systemctl restart windows-controller
 ```
 
   - `host` = Windows の Wi-Fi の IP（`ipconfig` で確認。ルーターで DHCP 予約しておくと変わらない）
-  - `mac_address` = `cc:48:3a:5c:90:cd`（WoL 用アダプタ `machine.ethernet_adapter` の MAC。アダプタを変えたら更新する。現状の値は内蔵 Ethernet のもの）
+  - `mac_address` = `9c:69:d3:cc:ee:fc`（WoL 用アダプタ `machine.ethernet_adapter` の MAC。アダプタを変えたら更新する。現状の値は Type-C USB LAN（Ethernet 2）のもの）
   - `broadcast` = `10.99.0.255`（Pi と PC の直結ケーブル）
 
 ## 4. 確認
 
 - [ ] Windows: `winctl doctor`
 - [ ] Discord: `/win status` が READY（または DEGRADED と理由）
-- [ ] Mac: Windows App で `192.168.11.30`、ユーザー名 `takoyaki`（Microsoft アカウントに切り替えた場合は `MicrosoftAccount\メールアドレス`）
+- [ ] Mac: Windows App で `192.168.11.19`、ユーザー名 `takoyaki`（Microsoft アカウントに切り替えた場合は `MicrosoftAccount\メールアドレス`）
 - [ ] Tailscale 管理画面で古い `alienware` / `desktop-…` 端末を削除
 - [ ] BIOS → WoL 検証: [bios.md](bios.md) → [wol-verification.md](wol-verification.md)

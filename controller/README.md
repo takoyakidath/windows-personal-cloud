@@ -43,7 +43,7 @@ sudo /opt/windows-personal-cloud/controller/install.sh            # --hardware-w
 2. `/etc/windows-controller/controller.env` に `DISCORD_TOKEN=...` を書く（権限 640、Git には入れない）。
 3. `/etc/windows-controller/controller.json` を編集する:
    - `windows.host`: Windows の LAN IP（推奨。Tailscale 名でも可）
-   - `windows.ssh_user`: Windows のユーザー名、`windows.mac_address`: 内蔵 Ethernet の MAC
+   - `windows.ssh_user`: Windows のユーザー名、`windows.mac_address`: WoL 用アダプタ（Type-C USB LAN）の MAC
    - `windows.broadcast`: 例 `192.168.1.255`
    - `discord.guild_id`、`discord.notify_channel_id`
    - `discord.allowed_user_ids` / `allowed_role_ids`: **ここにある ID だけ**が操作できる。両方空だと起動しない
