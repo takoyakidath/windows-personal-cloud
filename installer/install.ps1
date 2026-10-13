@@ -161,7 +161,6 @@ try {
     Save-InstallState -Status 'failed' -Step $(if ($file) { $file.BaseName } else { '' })
     Write-Host "Installation failed: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
-    Write-Host 'Fix the problem and run the installer again; finished steps are skipped automatically.'
 } finally {
     if ($Ctx.Warnings.Count -gt 0) {
         Write-Host ''
@@ -169,6 +168,16 @@ try {
         foreach ($w in $Ctx.Warnings) {
             Write-Host "  - $($w.Message)" -ForegroundColor Yellow
             if ($w.Command) { Write-Host "      $($w.Command)" -ForegroundColor Cyan }
+        }
+    }
+    if ($exitCode -ne 0) {
+        Write-Host ''
+        Write-Host 'The installer stopped before finishing.' -ForegroundColor Red
+        if (@($Ctx.Warnings | Where-Object { $_.Command }).Count -gt 0) {
+            Write-Host '  1) Run the manual commands listed above.' -ForegroundColor Yellow
+            Write-Host '  2) Then run bootstrap again (double-click bootstrap.cmd). Finished steps are skipped and it continues from where it stopped.' -ForegroundColor Yellow
+        } else {
+            Write-Host 'Run bootstrap again (double-click bootstrap.cmd). Finished steps are skipped and it continues from where it stopped.' -ForegroundColor Yellow
         }
     }
     if ($completed) {
