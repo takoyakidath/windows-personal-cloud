@@ -35,7 +35,7 @@
                 if (Get-Command $launcher -ErrorAction SilentlyContinue) { & $launcher install --root | Out-Null }
             }
             if (-not (Test-DistroRegistered)) {
-                Add-ManualAction "Could not register $distro automatically. Run 'wsl --install -d $distro' once, then re-run the installer."
+                Add-ManualAction "Could not register $distro automatically. Run this once, then re-run the installer:" "wsl --install -d $distro"
                 return 'ok'
             }
         }
@@ -58,7 +58,7 @@ CONF
 
         $pw = Invoke-WinctlWsl -Arguments @('-d', $distro, '-u', 'root', '--', 'passwd', '-S', $user)
         if ($pw.Output -match "^$user\s+(L|NP)\b") {
-            Add-ManualAction "Set a Linux password for '$user' (needed for sudo): wsl -d $distro -u root passwd $user"
+            Add-ManualAction "Set a Linux password for '$user' (needed for sudo). Run this, then type the password twice:" "wsl -d $distro -u root passwd $user"
         }
         # Restart the distro so systemd / default user take effect.
         Invoke-WinctlWsl -Arguments @('--terminate', $distro) | Out-Null

@@ -4,7 +4,7 @@
     Run  = {
         param($Ctx)
         if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-            Add-ManualAction 'Packages skipped (no winget). Update "App Installer" from the Microsoft Store, then run winctl update.'
+            Add-ManualAction 'Packages skipped (no winget). Update "App Installer" from the Microsoft Store, then run:' 'winctl update'
             return 'ok'
         }
         foreach ($id in @($Ctx.System.packages)) {

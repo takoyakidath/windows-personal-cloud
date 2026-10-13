@@ -70,6 +70,7 @@
         Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled -Value 0 -Type DWord
 
         $mac = ($adapter.MacAddress -replace '-', ':').ToLowerInvariant()
+        $Ctx.Facts['WolMac'] = $mac
         Write-Done "$($adapter.Name) ($($adapter.InterfaceDescription)) MAC $mac"
         if ($Ctx.System.machine.mac_address -ne $mac) {
             Add-ManualAction "Set machine.mac_address to `"$mac`" in config/system.json and in the Raspberry Pi controller config."

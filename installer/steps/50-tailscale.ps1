@@ -19,7 +19,7 @@
             & $exe up --authkey $env:TS_AUTHKEY --hostname $hostname --unattended
             if ($LASTEXITCODE -ne 0) { Add-ManualAction 'tailscale up with TS_AUTHKEY failed.' }
         } else {
-            Add-ManualAction "Log in to Tailscale: tailscale up --hostname $hostname --unattended"
+            Add-ManualAction 'Log in to Tailscale (open the URL it prints):' "tailscale up --hostname $hostname --unattended"
         }
         return 'ok'
     }
