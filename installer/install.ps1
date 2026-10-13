@@ -61,6 +61,7 @@ function Get-PiSetupScript {
     $broadcast = if ($link -match '^(\d+\.\d+\.\d+)\.\d+$') { "$($Matches[1]).255" } else { '255.255.255.255' }
     $user = $env:USERNAME.ToLowerInvariant()
     @"
+sudo -v
 sudo -u windows-controller ssh-keygen -R $ip -f /var/lib/windows-controller/known_hosts
 sudo python3 - <<'PY'
 import json
