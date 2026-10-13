@@ -82,8 +82,15 @@ try {
             Write-Host ''
             Write-Host 'A restart is required. Installation resumes automatically after you log in again.' -ForegroundColor Yellow
             if ($NoReboot) { Write-Host 'Restart manually when ready (-NoReboot was given).'; exit 3010 }
-            Write-Host 'Restarting in 20 seconds (Ctrl+C to cancel)...'
-            Start-Sleep -Seconds 20
+            Write-Host 'Restarting in 20 seconds (press any key to restart now, Ctrl+C to cancel)...'
+            $deadline = (Get-Date).AddSeconds(20)
+            try {
+                while ((Get-Date) -lt $deadline -and -not [Console]::KeyAvailable) { Start-Sleep -Milliseconds 200 }
+            } catch {
+                # No interactive console (redirected input, scheduled task): just wait out the countdown.
+                $left = [int][math]::Ceiling(($deadline - (Get-Date)).TotalSeconds)
+                if ($left -gt 0) { Start-Sleep -Seconds $left }
+            }
             Restart-Computer -Force
             exit 3010
         }
