@@ -40,7 +40,7 @@ Pi の eth0 ⇔ Alienware の Type-C USB LAN（`Ethernet 2`、ASIX）を直結�
 | Sleep | ✓ | | |
 | Shutdown | | | |
 
-実機の結果（Alienware m17 R3 + ASIX USB LAN）: Sleep (S3) で WoL 起動を確認。Hibernate (S4) は起きなかった。Windows 側（`wake_armed`、`*WakeOnMagicPacket` 有効、Fast Startup 無効、MAC 一致）と Pi 側（eth0 から magic packet 送出を tcpdump で確認、USB LAN の給電ランプ点灯）は正常で、BIOS/ハードウェアの制約と見られる。`night_mode` は `sleep`。
+実機の結果（Alienware m17 R3 + BUFFALO Type-C LAN アダプタ [ASIX]）: Sleep (S3) で WoL 起動を確認。Hibernate (S4) は起きなかった。Windows 側（`wake_armed`、`*WakeOnMagicPacket` 有効、Fast Startup 無効、MAC 一致）と Pi 側（eth0 から magic packet 送出を tcpdump で確認、USB LAN の給電ランプ点灯）は正常で、BIOS/ハードウェアの制約と見られる。`night_mode` は `sleep`。この組み合わせで Hibernate / Shutdown からの WoL は不可、として検証を終了する（内蔵 Killer E3000 も BIOS に WoL 項目が無く見込み薄）。
 ふたを閉じていると USB wake は効かない（Dell KB 000182921）ので、ふたは開けて運用する。
 
 結果に応じて `config/system.json` を設定する（product.txt §25 の優先順位）:
