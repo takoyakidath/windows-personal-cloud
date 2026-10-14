@@ -40,7 +40,7 @@
     "default_user": "takoyaki"
   },
   "power": {
-    "night_mode": "hibernate",
+    "night_mode": "sleep",
     "lan_only_wake": true,
     "night_check_time": "21:00",
     "sleep_grace_seconds": 45,

@@ -4,7 +4,7 @@ Night Mode で使う電源状態を決めるための手順。Alienware と Rasp
 
 ## 構成
 
-Pi の eth0 ⇔ Alienware の内蔵 Ethernet を直結（WoL 専用）。Pi は `install.sh --wol-link 10.99.0.1/24`、
+Pi の eth0 ⇔ Alienware の Type-C USB LAN（`Ethernet 2`、ASIX）を直結（WoL 専用）。Pi は `install.sh --wol-link 10.99.0.1/24`、
 `controller.json` の `windows.broadcast` は `10.99.0.255`。手動送信は `python3 -m wake <MAC> 10.99.0.255`。
 
 ## 準備
@@ -36,9 +36,12 @@ Pi の eth0 ⇔ Alienware の内蔵 Ethernet を直結（WoL 専用）。Pi は 
 
 | 電源状態 | WoL で起動 | ネットワーク復帰 | Tailscale 復帰 |
 | --- | --- | --- | --- |
-| Hibernate | | | |
-| Sleep | | | |
+| Hibernate | ✗（2 回試して起きない） | - | - |
+| Sleep | ✓ | | |
 | Shutdown | | | |
+
+実機の結果（Alienware m17 R3 + ASIX USB LAN）: Sleep (S3) で WoL 起動を確認。Hibernate (S4) は起きなかった。Windows 側（`wake_armed`、`*WakeOnMagicPacket` 有効、Fast Startup 無効、MAC 一致）と Pi 側（eth0 から magic packet 送出を tcpdump で確認、USB LAN の給電ランプ点灯）は正常で、BIOS/ハードウェアの制約と見られる。`night_mode` は `sleep`。
+ふたを閉じていると USB wake は効かない（Dell KB 000182921）ので、ふたは開けて運用する。
 
 結果に応じて `config/system.json` を設定する（product.txt §25 の優先順位）:
 

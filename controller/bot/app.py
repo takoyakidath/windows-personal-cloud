@@ -175,15 +175,15 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
             await interaction.followup.send(f"⚡ Sending Wake-on-LAN{suffix}. I will post here when the PC is ready.")
         bot.spawn(bot.monitor.wake(mode=target))
 
-    @group.command(name="sleep", description="Stop services and hibernate (skipped while gaming / backing up)")
+    @group.command(name="sleep", description="Stop services and sleep the PC (skipped while gaming / backing up)")
     async def sleep(interaction: discord.Interaction):
-        await run_remote(interaction, "sleep", "💤 Sleep requested. The PC hibernates unless a game, backup or important job is running.")
+        await run_remote(interaction, "sleep", "💤 Sleep requested. The PC sleeps unless a game, backup or important job is running.")
 
     @group.command(name="ready", description="Switch to READY mode")
     async def ready(interaction: discord.Interaction):
         await run_remote(interaction, "ready")
 
-    @group.command(name="game", description="Switch to GAME mode (stops WSL/Docker, no auto-hibernate)")
+    @group.command(name="game", description="Switch to GAME mode (stops WSL/Docker, no auto-sleep)")
     async def game(interaction: discord.Interaction):
         await run_remote(interaction, "game")
 
@@ -208,11 +208,11 @@ def build_group(bot: ControllerBot) -> app_commands.Group:
     async def doctor(interaction: discord.Interaction):
         await run_remote(interaction, "doctor")
 
-    @group.command(name="stay-awake", description="Skip tonight's automatic hibernate (until 06:00)")
+    @group.command(name="stay-awake", description="Skip tonight's automatic sleep (until 06:00)")
     async def stay_awake(interaction: discord.Interaction):
         await run_remote(interaction, "stayawake")
 
-    @group.command(name="allow-sleep", description="Re-enable automatic hibernate")
+    @group.command(name="allow-sleep", description="Re-enable automatic sleep")
     async def allow_sleep(interaction: discord.Interaction):
         await run_remote(interaction, "allowsleep")
 
